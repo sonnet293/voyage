@@ -38,7 +38,6 @@ const searchResults = document.getElementById("search-results");
 
 let userRef   = null;
 let entry     = [];
-let entryNames = []; // users/{uid}.entryNames: 카드에만 쓰는 표시 이름 (Firestore 에서만 수정, 비어 있으면 엔트리 이름)
 let cardSlots = Array(SLOT_COUNT).fill(null); // users/{uid}.cardSlots: [{ id, name } | null] x6
 let editingSlot = null;
 
@@ -110,7 +109,8 @@ function renderEntrySlot(index, mon) {
   const slot = el("div", "slot entry");
   slot.append(el("span", "slot-no", String(index + 1).padStart(2, "0")), el("span", "slot-badge", "엔트리"));
 
-  const name = (typeof entryNames[index] === "string" && entryNames[index].trim()) || mon.name;
+  // 카드 표시 이름: entry[i].cardName (Firestore 에서만 수정) > entry[i].name
+  const name = (typeof mon.cardName === "string" && mon.cardName.trim()) || mon.name;
   const id = ID_BY_NAME.get(normalize(name ?? ""));
   const types = el("div");
   if (id) {
@@ -346,7 +346,6 @@ onAuthStateChanged(auth, async (user) => {
     const snap = await getDoc(userRef);
     const data = snap.exists() ? snap.data() : {};
     entry = Array.isArray(data.entry) ? data.entry : [];
-    entryNames = Array.isArray(data.entryNames) ? data.entryNames : [];
     if (Array.isArray(data.cardSlots)) {
       cardSlots = Array.from({ length: SLOT_COUNT }, (_, i) => data.cardSlots[i] ?? null);
     }
@@ -381,7 +380,6 @@ async function showOtherTrainer(uid) {
       showMessage("트레이너 카드 없음");
     } else {
       entry = Array.isArray(data.entry) ? data.entry : [];
-      entryNames = Array.isArray(data.entryNames) ? data.entryNames : [];
       cardSlots = Array.from({ length: SLOT_COUNT }, (_, i) => data.cardSlots?.[i] ?? null);
       nameEl.textContent = data.nickname ?? "트레이너";
       document.title = `${data.nickname ?? "트레이너"}의 트레이너 카드`;
