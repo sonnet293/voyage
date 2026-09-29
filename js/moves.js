@@ -72,7 +72,7 @@ export const MOVES = {
                   rapidSpin: true, rank: { spd: 1, turns: 3 } },
   "울트라메가튀어오르기": { power: 0, type: "노말", accuracy: 100, alwaysHit: true, effect: null, divineStrike: true, targetSelf: true },
   "아침햇살":           { power: 0,  type: "노말", accuracy: 100, alwaysHit: true,
-                      effect: { moonlight: true }, targetSelf: true },
+                      effect: { heal: { default: 0.25, "쾌청": 0.3, "비": 0.2, "싸라기눈": 0.2, "모래바람": 0.2 } }, targetSelf: true },
 
   // ───── 불 ─────
   "화염바퀴":       { power: 40, type: "불", accuracy: 100, alwaysHit: false, effect: { chance: 0.1, status: "화상" } },
@@ -125,7 +125,8 @@ export const MOVES = {
   "번개펀치":     { power: 45, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.1, status: "마비" } },
   "10만볼트":     { power: 50, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.3, status: "마비" } },
   "방전":         { power: 50, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.3, status: "마비" }, aoe: true },
-  "번개":         { power: 60, type: "전기", accuracy: 70,  alwaysHit: false, effect: { chance: 0.3, status: "마비" } },
+  "번개":         { power: 60, type: "전기", accuracy: 60,  alwaysHit: false, effect: { chance: 0.3, status: "마비" },
+                    weatherAccuracy: { "비": 100 } },
   "전기쇼크":     { power: 30, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.1, status: "마비" } },
   "전기자석파":   { power: 0,  type: "전기", accuracy: 90,  alwaysHit: false, targetSelf: false,
                     effect: { chance: 1, status: "마비" } },
@@ -170,7 +171,7 @@ export const MOVES = {
                       rank: { targetDef: -1, turns: 2 } },
   "트릭플라워": { power: 40, type: "풀", accuracy: 100, alwaysHit: true, effect: null, alwaysCrit: true },
   "광합성":           { power: 0,  type: "풀", accuracy: 100, alwaysHit: true,
-                      effect: { moonlight: true }, targetSelf: true },
+                      effect: { heal: { default: 0.25, "쾌청": 0.3, "비": 0.2, "싸라기눈": 0.2, "모래바람": 0.2 } }, targetSelf: true },
   // ───── 얼음 ─────
   "눈보라":         { power: 40, type: "얼음", accuracy: 70,  alwaysHit: false, effect: { chance: 0.1, status: "얼음" }, aoeEnemy: true },
   "얼음뭉치":       { power: 35, type: "얼음", accuracy: 100, alwaysHit: true,  effect: null },
@@ -198,6 +199,8 @@ export const MOVES = {
    "발경":         { power: 40, type: "격투", accuracy: 100, alwaysHit: false, effect: { chance: 0.3, status: "마비" } },
    "성스러운칼": { power: 50, type: "격투", accuracy: 100, alwaysHit: false, skipEvasion: true, ignoreDefRank: true, effect: null },
    "리벤지": { power: 40, type: "격투", accuracy: 100, comeback: true },
+  "3연화살":           { power: 60, type: "격투", accuracy: 100, alwaysHit: false,
+                          effect: { chance: 0.3, volatile: "풀죽음" }, rank: { chance: 0.5, targetDef: -1, turns: 2 } },
 
   // ───── 독 ─────
   "용해액":   { power: 30, type: "독", accuracy: 100, alwaysHit: false, effect: null,
@@ -391,7 +394,7 @@ export const MOVES = {
   "초롱초롱눈동자": { power: 0,  type: "페어리", accuracy: 100, alwaysHit: true,  targetSelf: false, effect: null,
                       rank: { targetAtk: -1, turns: 2 } },
   "달빛":           { power: 0,  type: "페어리", accuracy: 100, alwaysHit: true,
-                      effect: { moonlight: true }, targetSelf: true },
+                      effect: { heal: { default: 0.25, "쾌청": 0.3, "비": 0.2, "싸라기눈": 0.2, "모래바람": 0.2 } }, targetSelf: true },
   "매혹의보이스":   { power: 50, type: "페어리", accuracy: 100, alwaysHit: false, effect: null, enchantedVoice: true },
 
   // ───── 날씨 ─────
@@ -421,7 +424,7 @@ export const MOVES = {
   "게으름피우기":     { power: 0,  type: "노말", accuracy: 100, alwaysHit: true,  effect: { heal: 0.22 }, targetSelf: true },
   "알낳기":     { power: 0,  type: "노말", accuracy: 100, alwaysHit: true,  effect: { heal: 0.22 }, targetSelf: true },
   "우유마시기":     { power: 0,  type: "노말", accuracy: 100, alwaysHit: true,  effect: { heal: 0.22 }, targetSelf: true },
-  "생명의물방울":{ power: 0, type: "물",   accuracy: 100, alwaysHit: true,  effect: { heal: 0.22 }, targetSelf: true, waterHeal: true },
+  "생명의물방울":{ power: 0, type: "물",   accuracy: 100, alwaysHit: true,  effect: { heal: 0.25 }, targetSelf: true },
   "희망사항":   { power: 0,  type: "노말", accuracy: 100, alwaysHit: true,  effect: null, wish: true, targetSelf: true },
   "속임수":     { power: 50, type: "악",   accuracy: 100, alwaysHit: false, effect: null, trickster: true },
   "이판사판태클":{ power: 70, type: "노말", accuracy: 100, alwaysHit: false, effect: { recoil: 0.33 } },

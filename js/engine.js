@@ -122,9 +122,17 @@ function calcBaseEvasionPercent(attackerSpd, defenderSpd) {
 }
 
 // 명중 판정 (기술 자체의 명중률만 사용). 실패하면 "빗나갔다" - 공격자 쪽 귀책.
-function rollAccuracy(moveData) {
+// weatherAccuracy: { [날씨]: 명중률 } - 해당 날씨일 때 명중률을 덮어씀 (예: 번개는 비일 때 100)
+function rollAccuracy(moveData, weatherType) {
   if (moveData.alwaysHit) return true;
-  return Math.random() < moveData.accuracy / 100;
+  const accuracy = moveData.weatherAccuracy?.[weatherType] ?? moveData.accuracy;
+  return Math.random() < accuracy / 100;
+}
+
+// 자가 회복 기술(effect.heal)의 회복 비율. heal이 숫자면 그대로, 객체면 날씨별 비율(없으면 default)
+function healRatio(heal, weatherType) {
+  if (typeof heal === "number") return heal;
+  return heal?.[weatherType] ?? heal?.default ?? 0;
 }
 
 // 회피 판정 (방어자의 회피율만 사용). 성공하면 "맞지 않았다" - 방어자 쪽 회피.
@@ -154,16 +162,28 @@ function activeGuard(pokemon, currentTurn) {
   return guard && currentTurn <= guard.expireTurn ? guard : null;
 }
 
-// 거대해머류로 이번 라운드에 잠긴 기술인지. moveLock: { name: 기술명, turn: 사용 불가 라운드 }
+// 도발: 걸린 다음 라운드부터 2라운드간 공격 기술(power>0)만 사용 가능. taunt: { startTurn, expireTurn }
+const TAUNT_TURNS = 2;
+
+export function isTaunted(pokemon, currentTurn) {
+  const taunt = pokemon?.taunt;
+  return !!taunt && currentTurn >= taunt.startTurn && currentTurn <= taunt.expireTurn;
+}
+
+// 이번 라운드에 쓸 수 없는 기술인지.
+// - 거대해머류: moveLock: { name: 기술명, turn: 사용 불가 라운드 }
+// - 도발: 위력 0인 기술 사용 불가
 export function isMoveLocked(pokemon, moveName, currentTurn) {
   const lock = pokemon?.moveLock;
-  return !!lock && lock.name === moveName && lock.turn === currentTurn;
+  if (lock && lock.name === moveName && lock.turn === currentTurn) return true;
+  return isTaunted(pokemon, currentTurn) && !((MOVES[moveName]?.power ?? 0) > 0);
 }
 
 // 상대 포켓몬에게 영향을 주는 기술인지 (데미지 / 상태이상·상태변화 / 상대 랭크 변화)
 function targetsOpponent(moveData) {
   if (moveData.power > 0) return true;
   if (moveData.effect?.status || moveData.effect?.volatile) return true;
+  if (moveData.taunt) return true;
   const rank = moveData.rank ?? {};
   return !!(rank.targetAtk || rank.targetDef || rank.targetSpd);
 }
@@ -255,6 +275,15 @@ function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, even
     entries[side][activeIdx[side]] = { ...pkmn, screen: null };
     const n = pkmn.name ?? "포켓몬";
     log.push(`${n}의 ${pkmn.screen.name}${josa(pkmn.screen.name, "이가")} 사라졌다!`);
+  }
+
+  // 도발 만료: 마지막 라운드 종료 시 해제
+  for (const side of ["p1", "p2"]) {
+    const pkmn = entries[side][activeIdx[side]];
+    if (!pkmn?.taunt || currentTurn < pkmn.taunt.expireTurn) continue;
+    entries[side][activeIdx[side]] = { ...pkmn, taunt: null };
+    const n = pkmn.name ?? "포켓몬";
+    log.push(`${n}의 도발 효과가 풀렸다!`);
   }
 
   // 날씨 라운드 종료 처리: 지속 로그 -> 모래바람/싸라기눈 데미지 -> (종료라면) 종료 로그
@@ -413,7 +442,11 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   if (!moveData) return fail(`moves.js에 "${moveSlot.name}" 기술이 정의되어 있지 않음`);
 
   // 거대해머류(heavyHammer): 사용한 다음 라운드에는 같은 기술을 쓸 수 없음
-  if (!diving && isMoveLocked(attacker, moveSlot.name, currentTurn)) return fail(`${moveSlot.name}은(는) 이번 라운드에 사용할 수 없음`);
+  if (!diving && isMoveLocked(attacker, moveSlot.name, currentTurn)) {
+    return fail(isTaunted(attacker, currentTurn)
+      ? `도발 상태라 ${moveSlot.name}은(는) 사용할 수 없음`
+      : `${moveSlot.name}은(는) 이번 라운드에 사용할 수 없음`);
+  }
 
   // 유턴: 공격과 교체가 한 세트. 교체할 수 있는 벤치가 있으면 교체 대상을 함께 받아야 함.
   const myBenchAlive = entries[myKey].some((p, i) => i !== activeIdx[myKey] && p && p.hp > 0);
@@ -521,6 +554,21 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
       entries[myKey][activeIdx[myKey]] = currentAttacker;
       log.push(`${attackerName}${josa(attackerName, "은는")} ${moveSlot.name}${josa(moveSlot.name, "으로")} 받는 데미지가 줄어들었다!`);
     }
+  } else if (moveData.effect?.heal) {
+    // 자가 회복 기술: 최대 체력 x 회복 비율(날씨에 따라 달라질 수 있음)만큼 회복
+    const attackerName = currentAttacker.name ?? "포켓몬";
+    log.push(`${attackerName}의 ${moveSlot.name}!`);
+    const maxHp = currentAttacker.maxHp ?? currentAttacker.hp;
+    const ratio = healRatio(moveData.effect.heal, currentWeather?.type);
+    const heal = Math.min(maxHp - currentAttacker.hp, Math.max(1, Math.round(maxHp * ratio)));
+    if (heal > 0) {
+      currentAttacker = { ...currentAttacker, hp: currentAttacker.hp + heal };
+      entries[myKey][activeIdx[myKey]] = currentAttacker;
+      log.push(`${attackerName}의 체력이 회복되었다!`);
+      events.push({ logIndex: log.length - 1, type: "heal", side: myKey, hp: currentAttacker.hp });
+    } else {
+      log.push(`그러나 ${attackerName}의 체력은 가득 차 있다!`);
+    }
   } else if (defGuard && !defGuard.spiky && moveData.power > 0 && !breaksProtection) {
     // 상대의 방어/판별: 공격 기술을 막고 방어 상태 소모 (변화기는 막지 않음)
     const attackerName = currentAttacker.name ?? "포켓몬";
@@ -578,7 +626,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
       }
     }
 
-    const accuracyHit = rollAccuracy(moveData);
+    const accuracyHit = rollAccuracy(moveData, currentWeather?.type);
 
     if (!accuracyHit) {
       log.push(`그러나 ${attackerName}의 공격은 빗나갔다!`);
@@ -685,6 +733,16 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           }
         }
 
+        // 도발: 다음 라운드부터 TAUNT_TURNS 라운드간 공격 기술만 사용 가능. 이미 걸려 있으면 실패.
+        if (moveData.taunt) {
+          if (updatedDefender.taunt && currentTurn <= updatedDefender.taunt.expireTurn) {
+            log.push("그러나 실패했다!");
+          } else {
+            updatedDefender = { ...updatedDefender, taunt: { startTurn: currentTurn + 1, expireTurn: currentTurn + TAUNT_TURNS } };
+            log.push(`${defenderName}${josa(defenderName, "은는")} 도발에 넘어갔다!`);
+          }
+        }
+
         entries[oppKey][activeIdx[oppKey]] = updatedDefender;
 
         // 랭크 변화. moves.js의 rank: { atk?, def?, spd?, targetAtk?, targetDef?, targetSpd?, turns, chance? }
@@ -782,9 +840,9 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   return ok(update);
 }
 
-// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록)
+// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발)
 function clearOnSwitchOut(pokemon) {
-  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0 };
+  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null };
 }
 
 // 교체 공통 처리(자발적 교체/강제 교체/유턴): 나가는 포켓몬 상태 정리 -> 내보내기 로그/연출 -> 장판 적용.
