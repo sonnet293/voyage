@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="css/style.css">
+    <title>Battle Frontier | Main</title>
+</head>
+<body>
+
+    <header class="topbar">
+        <a class="brand" href="main.html"><span>BATTLE FRONTIER</span></a>
+        <div class="topbar-actions">
+            <a class="trainer-chip" href="profile.html" title="트레이너 카드">
+                <span class="initial" id="trainer-initial">?</span>
+                <span class="label" id="trainer-name">트레이너</span>
+            </a>
+            <button type="button" class="text-btn" id="logoutBtn">로그아웃</button>
+        </div>
+    </header>
+
+    <main class="main-wrap">
+        <div class="main-head">
+            <div>
+                <span class="eyebrow">BATTLE ROOM</span>
+                <h1>배틀룸 선택</h1>
+            </div>
+            <div id="room-summary" class="room-summary"></div>
+        </div>
+
+        <div id="room-grid" class="room-grid"></div>
+    </main>
+
+    <script type="module" src="js/main.js"></script>
+    
+</body>
+</html>

@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Server</title>
+    <style>
+        body { font-family: sans-serif; margin: 16px; background: #111; color: #eee; }
+        input, button { font-size: 14px; padding: 6px 10px; margin: 4px 0; }
+        #gm-panel { display: none; }
+        #gm-uid { font-family: monospace; color: #fbb917; }
+        .room-row { padding: 4px 0; border-bottom: 1px solid #333; font-family: monospace; }
+        #gm-log { height: 60vh; overflow-y: auto; background: #000; padding: 8px; font-family: monospace; font-size: 13px; }
+        .log-warn { color: #ff9800; }
+        .log-error { color: #f44336; }
+        .notice { color: #aaa; font-size: 13px; }
+    </style>
+</head>
+<body>
+    <h2>서버 로그</h2>
+
+    <div id="gm-login">
+        <div><input id="gm-email" type="email" placeholder="GM 이메일"></div>
+        <div><input id="gm-password" type="password" placeholder="비밀번호"></div>
+        <button id="gm-login-btn">로그인</button>
+        <div id="gm-login-msg"></div>
+    </div>
+
+    <div id="gm-panel">
+        <p>GM UID: <span id="gm-uid"></span> <button id="gm-logout-btn">로그아웃</button></p>
+        <p class="notice">이 창이 열려 있는 동안에만 게임이 진행됩니다. 별도 창으로 띄워 두세요.</p>
+        <h3>방</h3>
+        <div id="gm-rooms"></div>
+        <h3>처리 로그</h3>
+        <div id="gm-log"></div>
+    </div>
+
+    <script type="module" src="./gm.js"></script>
+</body>
+</html>

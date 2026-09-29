@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../css/intro.css">
+    <link rel="stylesheet" href="../css/battleroom.css">
+    <title>BATTEROOM - 2</title>
+</head>
+<body>
+
+    <!--인트로 오버레이-->
+    <div id="intro-overlay">
+        <div id="touch-screen">
+            <div id="touch-prompt">아무데나 터치하여 시작!</div>
+            <div id="touch-ready-status"></div>
+        </div>
+        <div id="vs-screen">
+            <div class="vs-bg-line"></div>
+            <div class="vs-flash"  id="vs-flash"></div>
+            <div class="vs-burst"  id="vs-burst"></div>
+            <div class="vs-slide">
+                <div class="vs-left" id="vs-left">
+                    <div class="vs-inner" id="vs-inner-left">
+                        <div class="vs-name" id="vs-name-left">PLAYER1</div>
+                    </div>
+                </div>
+                <div class="vs-right" id="vs-right">
+                    <div class="vs-inner" id="vs-inner-right">
+                        <div class="vs-name" id="vs-name-right">PLAYER2</div>
+                    </div>
+                </div>
+            </div>
+            <div class="vs-label" id="vs-label">VS</div>
+        </div>
+    </div>
+
+    <div class="main">
+
+        <div id="battle-wrapper" class="battle-wrap">
+
+            <div class="battle-top">
+
+                <!--상단 좌측 아군 섹션-->
+                <div class="mine-col">
+                    <span id="mine-name" class="name">-</span>
+                    <div id="mine-pokemon-area" class="pokemon-panel mine">
+                        <div class="portrait-wrap">
+                            <div id="mine-portrait-placeholder" class="portrait-placeholder"></div>
+                            <img alt="" id="mine-portrait" class="portrait-img"/>
+                        </div>
+                        <div class="hp-card">
+                            <div class="hp-info">
+                                <div id="mine-stats" class="stats"></div>
+                                <span id="mine-hp" class="hp-text">-</span>
+                            </div>
+                            <div class="hp-bar-bg">
+                                <div id="mine-hp-bar" class="hp-bar"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!--상단 중앙 주사위, 턴 섹션-->
+                <div class="turn-info">
+                    <div id="turn-indicator" class="turn-indicator"></div>
+                    <div id="result" class="result"></div>
+                    <div id="diceRow" class="dice-row">
+                        <div class="dice-box">
+                            <div id="dice-mine-name" class="dice-name">-</div>
+                            <div id="dice-mine" class="dice-number">-</div>
+                        </div>
+                        <div class="dice-vs">VS</div>
+                        <div class="dice-box">
+                            <div id="dice-enemy-name" class="dice-name">-</div>
+                            <div id="dice-enemy" class="dice-number">-</div>
+                        </div>
+                    </div>
+                    
+                </div>
+
+                <!--상단 우측 적군 섹션-->
+                <div class="opp-col">
+                    <span id="enemy-name" class="name">-</span>
+                    <div id="enemy-pokemon-area" class="pokemon-panel oppnent">
+                        <div class="hp-card">
+                            <div class="hp-info">
+                                <span id="enemy-hp" class="hp-text" style="display: none;">-</span>
+                                <div id="enemy-stats" class="stats"></div>
+                            </div>
+                            <div class="hp-bar-bg">
+                                <div id="enemy-hp-bar" class="hp-bar"></div>
+                            </div>
+                        </div>
+                        <div class="portrait-wrap">
+                            <div id="enemy-portrait-placeholder" class="portrait-placeholder"></div>
+                            <img alt="" id="enemy-portrait" class="portrait-img" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+            <div class="battle-middle">
+
+                <div class="my-section">
+                    <div id="leaveBtn" style="display: none;">LEAVE</div>
+                    <div class="move-grid">
+                        <button id="moveBtn0" class="move-btn" style="display: none;"></button>
+                        <button id="moveBtn1" class="move-btn" style="display: none;"></button>
+                        <button id="moveBtn2" class="move-btn" style="display: none;"></button>
+                        <button id="moveBtn3" class="move-btn" style="display: none;"></button>
+                    </div>
+                    <div id="mine-bench" class="bench-list"></div>
+                </div>
+                <div id="battle-log"></div>
+            </div>
+
+            <div class="battle-bottom">
+                
+                <div id="spectator-chat-section" class="chat-section" style="display: none;">
+                    <div class="chat-title">관전자 채팅</div>
+                    <div id="spectator-chat-messages" class="chat-message"></div>
+                    <div class="chat-input-row">
+                        <input type="text" id="spectator-chat-input" placeholder="메시지 입력" />
+                        <button id="spectator-chat-send-btn">전송</button>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    <script>
+        const ROOM_ID = "battleroom2";
+    </script>
+    <script type="module" src="../js/intro.js"></script>
+    <script type="module" src="../js/battle.js"></script>
+</body>
+</html>

@@ -1,0 +1,106 @@
+/* 게임 시작 전 인트로 */
+#intro-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: #000; overflow: hidden;
+      transition: opacity 0.8s ease;
+    }
+    #intro-overlay.fade-out { opacity: 0; pointer-events: none; }
+    #intro-overlay.hidden   { display: none; }
+
+    #touch-screen {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+    }
+    #touch-prompt {
+      color: #fff; font-size: clamp(1rem,4vw,1.6rem);
+      letter-spacing: 0.2em;
+      animation: blink 1.4s ease-in-out infinite;
+    }
+    #touch-ready-status {
+      margin-top: 2vh; color: rgba(255,255,255,0.45);
+      font-size: clamp(0.7rem,2.5vw,1rem); letter-spacing: 0.1em;
+    }
+    @keyframes blink { 0%,100%{opacity:.2} 50%{opacity:1} }
+
+    #vs-screen { position: absolute; inset: 0; display: none; }
+    #vs-screen.show { display: block; }
+
+    .vs-bg-line {
+      position: absolute; width: 300%; height: 300%;
+      background: repeating-linear-gradient(
+        45deg, rgba(255,255,255,.08) 0px, rgba(255,255,255,.08) 2px,
+        transparent 2px, transparent 25px);
+      animation: moveBg .8s linear infinite;
+    }
+    @keyframes moveBg { from{transform:translate(0,0)} to{transform:translate(-300px,-300px)} }
+
+    .vs-flash {
+      position: absolute; width: 100%; height: 100%;
+      background: white; opacity: 0; z-index: 5; pointer-events: none;
+    }
+    .vs-flash.show { animation: flashBoom .25s ease-out; }
+    @keyframes flashBoom { 0%{opacity:1} 100%{opacity:0} }
+
+    .vs-burst {
+      position: absolute; top: 50%; left: 50%;
+      width: clamp(20px,5vw,60px); height: clamp(20px,5vw,60px);
+      border-radius: 50%; border: 4px solid rgba(255,255,255,.7);
+      transform: translate(-50%,-50%) scale(0); z-index: 9; pointer-events: none;
+    }
+    .vs-burst.show { animation: burst .5s ease-out forwards; }
+    @keyframes burst {
+      0%   { transform:translate(-50%,-50%) scale(0); opacity:1; }
+      100% { transform:translate(-50%,-50%) scale(8); opacity:0; }
+    }
+
+    .vs-slide {
+      position: absolute; inset: 0;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 clamp(10px,5vw,80px); box-sizing: border-box;
+    }
+    .vs-left, .vs-right { width: 42%; color: white; opacity: 0; }
+    .vs-left  { transform: translateX(-150%) scale(1.2); text-align: left; }
+    .vs-right { transform: translateX( 150%) scale(1.2); text-align: right; }
+    .vs-left.show  { animation: slideLeft  .4s cubic-bezier(.2,1.2,.3,1) forwards; }
+    .vs-right.show { animation: slideRight .4s cubic-bezier(.2,1.2,.3,1) forwards; }
+    @keyframes slideLeft  { 80%{transform:translateX(10%) scale(1.05);opacity:1} 100%{transform:translateX(0) scale(1);opacity:1} }
+    @keyframes slideRight { 80%{transform:translateX(-10%) scale(1.05);opacity:1} 100%{transform:translateX(0) scale(1);opacity:1} }
+
+    .vs-label {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%,-50%) scale(0);
+      font-size: clamp(3rem,10vw,7rem); font-weight: bold;
+      color: #ffcc00; text-shadow: 0 0 20px red, 0 0 60px orange;
+      z-index: 10; pointer-events: none;
+    }
+    .vs-label.show { animation: vsImpact .4s cubic-bezier(.2,1.5,.3,1) forwards; }
+    @keyframes vsImpact {
+      0%  {transform:translate(-50%,-50%) scale(0)}
+      60% {transform:translate(-50%,-50%) scale(1.6)}
+      80% {transform:translate(-50%,-50%) scale(.9)}
+      100%{transform:translate(-50%,-50%) scale(1)}
+    }
+    .vs-name { font-size: clamp(1.2rem,4vw,2.8rem); font-weight: bold; letter-spacing: .15em; }
+    .vs-inner { display: inline-block; }
+    .vs-shake { animation: vsShake .25s; }
+    @keyframes vsShake {
+      0%  {transform:translate(0,0)}   25%{transform:translate(-1vw,.5vh)}
+      50% {transform:translate(1vw,-.5vh)} 75%{transform:translate(-.6vw,.3vh)}
+      100%{transform:translate(0,0)}
+    }
+    .drift-left  { animation: driftLeft  20s linear infinite alternate; }
+    .drift-right { animation: driftRight 20s linear infinite alternate; }
+    @keyframes driftLeft  { from{transform:translateY(0)} to{transform:translateY(40px)} }
+    @keyframes driftRight { from{transform:translateY(0)} to{transform:translateY(-40px)} }
+
+    @media (max-width:430px) {
+      .vs-slide { flex-direction:column; justify-content:center; gap:8vh; }
+      .vs-left,.vs-right { width:100%; text-align:center; }
+      .vs-left  { transform:translateY(-150%) scale(1.2); }
+      .vs-right { transform:translateY( 150%) scale(1.2); }
+      @keyframes slideLeft  { 80%{transform:translateY(10%) scale(1.05);opacity:1} 100%{transform:translateY(0) scale(1);opacity:1} }
+      @keyframes slideRight { 80%{transform:translateY(-10%) scale(1.05);opacity:1} 100%{transform:translateY(0) scale(1);opacity:1} }
+      @keyframes driftLeft  { from{transform:translateX(0)} to{transform:translateX(-40px)} }
+      @keyframes driftRight { from{transform:translateX(0)} to{transform:translateX(40px)} }
+    }

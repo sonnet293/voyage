@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Battleroom - 3</title>
+    <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+
+    <main class="lobby">
+        <section class="lobby-hero" id="lobby-hero">
+            <span class="status-pill" id="room-status" data-status="waiting"><i></i><span>대기 중</span></span>
+            <span class="eyebrow">ROOM 03 · 대기실</span>
+            <h1 id="room-name">Battleroom - 3</h1>
+        </section>
+
+        <div id="swap-status" class="swap-banner" role="status" hidden></div>
+
+        <section class="versus">
+            <article id="player1" class="player-card" data-state="empty"></article>
+            <div class="versus-mark">VS</div>
+            <article id="player2" class="player-card" data-state="empty"></article>
+        </section>
+
+        <p id="lobby-hint" class="lobby-hint"></p>
+
+        <section class="spectators">
+            <header><h2>관전자</h2><span class="count-badge" id="spectator-count">0</span></header>
+            <ul id="spectator-list" class="spectator-list"></ul>
+        </section>
+    </main>
+
+    <footer class="lobby-actions">
+        <button type="button" id="leaveBtn" class="btn btn-ghost">LEAVE</button>
+        <button type="button" id="readyBtn" class="btn btn-primary" aria-pressed="false" hidden>READY</button>
+    </footer>
+
+    <script>
+        const ROOM_ID = "battleroom3";
+    </script>
+    <script type="module" src="../js/battleroom.js"></script>
+
+</body>
+</html>

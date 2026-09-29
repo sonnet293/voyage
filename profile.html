@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>트레이너 카드</title>
+    <link rel="stylesheet" href="css/profile.css">
+</head>
+<body>
+
+    <main class="trainer-card" id="trainer-card">
+        <!-- 좌측 40%: 프로필 사진 -->
+        <section class="card-left">
+            <div class="card-label">TRAINER CARD</div>
+            <label class="avatar" id="avatar" title="클릭해서 프로필 사진 변경" tabindex="0" role="button" aria-label="프로필 사진 변경">
+                <img id="avatar-img" alt="트레이너 프로필 사진" hidden>
+                <span class="avatar-placeholder" id="avatar-placeholder"><span class="avatar-symbol" aria-hidden="true">＋</span><strong>트레이너 카드</strong><span>사진을 추가해 프로필을 꾸며보세요</span></span>
+                <span class="avatar-edit" aria-hidden="true">사진 변경 ↗</span>
+                <span class="avatar-uploading" id="avatar-uploading" hidden>업로드 중…</span>
+                <input type="file" id="avatar-input" accept="image/png,image/jpeg,image/webp,image/gif" hidden>
+            </label>
+            <div class="trainer-identity"><span class="trainer-caption">TRAINER</span><h1 class="trainer-name" id="trainer-name">…</h1></div>
+            <p class="card-message" id="card-message" role="status"></p>
+        </section>
+
+        <!-- 우측 60%: 포켓몬 3 x 2 -->
+        <section class="card-right">
+            <header class="party-heading"><div><span class="eyebrow">MY PARTNERS</span><h2>ENTRY</h2></div><span class="party-count" id="party-count">0 / 6</span></header>
+            <div class="party-grid" id="party-grid" aria-label="파트너 포켓몬"></div>
+        </section>
+    </main>
+
+    <!-- 포켓몬 검색 모달 -->
+    <dialog class="search-dialog" id="search-dialog" aria-labelledby="search-title">
+        <div class="search-intro"><span class="eyebrow">FIND YOUR PARTNER</span><h2 id="search-title">포켓몬 추가</h2></div>
+        <form method="dialog" class="search-head">
+            <input type="search" id="search-input" aria-label="포켓몬 이름 또는 도감 번호" placeholder="포켓몬 이름 또는 도감 번호" autocomplete="off">
+            <button class="search-close" value="cancel" aria-label="닫기">✕</button>
+        </form>
+        <div class="search-results" id="search-results"></div>
+    </dialog>
+
+    <script type="module" src="js/profile.js"></script>
+
+</body>
+</html>
