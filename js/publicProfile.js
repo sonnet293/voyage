@@ -12,6 +12,7 @@ export function syncPublicProfile(uid, userData) {
         profileImage: userData?.profileImage ?? null,
         cardSlots: Array.isArray(userData?.cardSlots) ? userData.cardSlots : [],
         entry: Array.isArray(userData?.entry) ? userData.entry : [],
+        entryNames: Array.isArray(userData?.entryNames) ? userData.entryNames : [],
         updatedAt: serverTimestamp(),
     }).catch((err) => console.error("공개 프로필 갱신 실패", err));
 }

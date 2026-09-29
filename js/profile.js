@@ -38,6 +38,7 @@ const searchResults = document.getElementById("search-results");
 
 let userRef   = null;
 let entry     = [];
+let entryNames = []; // users/{uid}.entryNames: 카드에만 쓰는 표시 이름 (Firestore 에서만 수정, 비어 있으면 엔트리 이름)
 let cardSlots = Array(SLOT_COUNT).fill(null); // users/{uid}.cardSlots: [{ id, name } | null] x6
 let editingSlot = null;
 
@@ -109,14 +110,15 @@ function renderEntrySlot(index, mon) {
   const slot = el("div", "slot entry");
   slot.append(el("span", "slot-no", String(index + 1).padStart(2, "0")), el("span", "slot-badge", "엔트리"));
 
-  const id = ID_BY_NAME.get(normalize(mon.name ?? ""));
+  const name = (typeof entryNames[index] === "string" && entryNames[index].trim()) || mon.name;
+  const id = ID_BY_NAME.get(normalize(name ?? ""));
   const types = el("div");
   if (id) {
-    slot.append(spriteImg(spriteUrl(id), mon.name));
+    slot.append(spriteImg(spriteUrl(id), name));
   } else if (mon.portrait) {
-    slot.append(spriteImg(mon.portrait, mon.name, true));
+    slot.append(spriteImg(mon.portrait, name, true));
   }
-  slot.append(el("div", "slot-name", mon.name ?? "???"), types);
+  slot.append(el("div", "slot-name", name ?? "???"), types);
 
   if (mon.type?.length) {
     types.replaceWith(typeChips(mon.type));
@@ -344,6 +346,7 @@ onAuthStateChanged(auth, async (user) => {
     const snap = await getDoc(userRef);
     const data = snap.exists() ? snap.data() : {};
     entry = Array.isArray(data.entry) ? data.entry : [];
+    entryNames = Array.isArray(data.entryNames) ? data.entryNames : [];
     if (Array.isArray(data.cardSlots)) {
       cardSlots = Array.from({ length: SLOT_COUNT }, (_, i) => data.cardSlots[i] ?? null);
     }
@@ -378,6 +381,7 @@ async function showOtherTrainer(uid) {
       showMessage("트레이너 카드 없음");
     } else {
       entry = Array.isArray(data.entry) ? data.entry : [];
+      entryNames = Array.isArray(data.entryNames) ? data.entryNames : [];
       cardSlots = Array.from({ length: SLOT_COUNT }, (_, i) => data.cardSlots?.[i] ?? null);
       nameEl.textContent = data.nickname ?? "트레이너";
       document.title = `${data.nickname ?? "트레이너"}의 트레이너 카드`;
