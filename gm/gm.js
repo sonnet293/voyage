@@ -211,7 +211,7 @@ function judge(room, action) {
       if (!isPlayer) return { ok: false, reason: "플레이어가 아님" };
       if (!sameRound) return { ok: false, reason: "지난 라운드의 요청" };
       if (!Number.isInteger(payload.moveIdx)) return { ok: false, reason: "잘못된 기술 번호" };
-      return useMove(room, side, payload.moveIdx);
+      return useMove(room, side, payload.moveIdx, payload.switchIdx ?? null); // switchIdx: 유턴류 교체 대상
     case "switch":
       if (!isPlayer) return { ok: false, reason: "플레이어가 아님" };
       if (!sameRound) return { ok: false, reason: "지난 라운드의 요청" };
