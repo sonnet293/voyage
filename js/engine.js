@@ -152,6 +152,9 @@ const FURY_CUTTER_MAX_STACK = 2;
 const SCREEN_TURNS = 5;
 const SCREEN_DAMAGE_MULT = 0.75;
 
+// 카운터: 직전에 받은 데미지(lastDamageTaken)에 곱하는 배율
+const COUNTER_MULT = 1.5;
+
 // 방어류(방어/판별/니들가드): 사용한 라운드 포함 2라운드 유지, 직전 행동도 방어류 성공이었으면 성공률 45%
 const GUARD_TURNS = 2;
 const GUARD_REPEAT_CHANCE = 0.33;
@@ -183,7 +186,7 @@ export function isMoveLocked(pokemon, moveName, currentTurn) {
 function targetsOpponent(moveData) {
   if (moveData.power > 0) return true;
   if (moveData.effect?.status || moveData.effect?.volatile) return true;
-  if (moveData.taunt) return true;
+  if (moveData.taunt || moveData.roar) return true;
   const rank = moveData.rank ?? {};
   return !!(rank.targetAtk || rank.targetDef || rank.targetSpd);
 }
@@ -569,6 +572,11 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     } else {
       log.push(`그러나 ${attackerName}의 체력은 가득 차 있다!`);
     }
+  } else if (moveData.counter && !currentAttacker.lastDamageTaken) {
+    // 카운터: 아직 상대에게 피격당하지 않았으면(받은 데미지가 없으면) 실패
+    const attackerName = currentAttacker.name ?? "포켓몬";
+    log.push(`${attackerName}의 ${moveSlot.name}!`);
+    log.push("그러나 실패했다!");
   } else if (defGuard && !defGuard.spiky && moveData.power > 0 && !breaksProtection) {
     // 상대의 방어/판별: 공격 기술을 막고 방어 상태 소모 (변화기는 막지 않음)
     const attackerName = currentAttacker.name ?? "포켓몬";
@@ -649,6 +657,13 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
 
         let updatedDefender = { ...defender };
 
+        // 깨트리기: 공격이 맞으면 데미지 계산 전에 상대의 빛의장막/리플렉터를 깨뜨림 (타입상 효과가 없으면 깨지 못함)
+        if (moveData.breakBarrier && updatedDefender.screen && typeMult > 0) {
+          const screenName = updatedDefender.screen.name;
+          updatedDefender = { ...updatedDefender, screen: null };
+          log.push(`${defenderName}의 ${screenName}${josa(screenName, "이가")} 깨졌다!`);
+        }
+
         // 위력이 0인 기술(상태이상/랭크 변화 전용)은 데미지를 주지 않음
         if (moveData.power > 0) {
           // 최종 피해량 = ((위력 + 공격력x4 + 1d10) x 공격랭크보정 x 타입상성 x 자속) - (방어력x3 x 방어랭크보정)
@@ -660,23 +675,50 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
             power = Math.min(FURY_CUTTER_MAX_POWER, moveData.power + 10 * (attacker.furyCutter ?? 0));
             furyCutterHit = true;
           }
-          const rawDamage =
-            (power + attacker.atk * 4 + rollD10()) * atkMult * typeMult * stab * weatherMult -
-            defender.def * 3 * defMult;
-          const isCrit = rollCrit(attacker);
-          const screenMult = defender.screen ? SCREEN_DAMAGE_MULT : 1; // 빛의장막/리플렉터
-          const dmg = Math.max(0, Math.round(rawDamage * (isCrit ? 1.5 : 1) * screenMult));
-          const newHp = Math.max(0, defender.hp - dmg);
+
+          // 연속 공격(multiHit: { min, max, fixedDamage? }): min~max회 중 랜덤으로 때림. 매 타격마다 1d10/급소를 따로 판정하고,
+          // 상대가 도중에 쓰러지면 멈춤. fixedDamage가 있으면 타격당 고정 데미지 (타입상 효과가 없으면 0)
+          // 카운터: 직전에 받은 데미지 x1.5를 고정 데미지로 돌려줌 (급소/랭크/장막 무관, 타입상 효과가 없으면 0)
+          const counterDmg = moveData.counter ? Math.round((attacker.lastDamageTaken ?? 0) * COUNTER_MULT) : null;
+          const multiHit = moveData.multiHit;
+          const hitCount = multiHit
+            ? multiHit.min + Math.floor(Math.random() * (multiHit.max - multiHit.min + 1))
+            : 1;
+          const screenMult = updatedDefender.screen ? SCREEN_DAMAGE_MULT : 1; // 빛의장막/리플렉터
+          let newHp = updatedDefender.hp;
+          let dmg = 0; // 이번 기술로 준 총 데미지
+          let hits = 0;
+          while (hits < hitCount && newHp > 0) {
+            let hitDmg;
+            let isCrit = false;
+            if (counterDmg !== null) {
+              hitDmg = typeMult === 0 ? 0 : counterDmg;
+            } else if (multiHit?.fixedDamage) {
+              hitDmg = typeMult === 0 ? 0 : multiHit.fixedDamage;
+            } else {
+              const rawDamage =
+                (power + attacker.atk * 4 + rollD10()) * atkMult * typeMult * stab * weatherMult -
+                defender.def * 3 * defMult;
+              isCrit = rollCrit(attacker);
+              hitDmg = Math.max(0, Math.round(rawDamage * (isCrit ? 1.5 : 1) * screenMult));
+            }
+            newHp = Math.max(0, newHp - hitDmg);
+            dmg += hitDmg;
+            hits++;
+            if (isCrit && hitDmg > 0) log.push("급소에 맞았다!");
+            if (typeMult === 0) break;
+          }
 
           // lastHitRound: 이번 라운드에 상대의 공격 기술에 맞았다는 표시 (눈사태 위력 판정용)
-          updatedDefender = { ...updatedDefender, hp: newHp, lastHitRound: currentTurn };
+          // lastDamageTaken: 상대의 공격 기술로 마지막에 받은 데미지 (카운터용, 라운드가 바뀌어도 유지)
+          updatedDefender = { ...updatedDefender, hp: newHp, lastHitRound: currentTurn, lastDamageTaken: dmg };
           events.push({ logIndex: moveLogIndex, type: "hit", side: oppKey, hp: newHp, status: defender.status ?? null, hasAttacker: true });
-
-          if (isCrit && dmg > 0) log.push("급소에 맞았다!");
 
           if (typeMult === 0) log.push(`${defenderName}에게는 효과가 없는 듯하다...`);
           else if (typeMult > 1) log.push("효과가 굉장했다!");
           else if (typeMult < 1) log.push("효과가 별로인 듯하다...");
+
+          if (multiHit && typeMult > 0) log.push(`${hits}번 맞았다!`);
 
           // 흡수기(effect.drain): 가한 데미지의 drain 비율만큼 회복 (최대 체력까지)
           if (moveData.effect?.drain && dmg > 0) {
@@ -767,6 +809,21 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           }
         }
 
+        // 울부짖기류(roar): 상대의 기절하지 않은 벤치 포켓몬 중 랜덤 1마리와 강제 교체. 벤치가 없으면 실패.
+        // 들어온 포켓몬이 장판으로 쓰러지면 아래 전멸/교체 체크에서 처리됨.
+        if (moveData.roar) {
+          const benchIdxs = entries[oppKey]
+            .map((p, i) => (i !== activeIdx[oppKey] && p && p.hp > 0 ? i : -1))
+            .filter((i) => i >= 0);
+          if (benchIdxs.length === 0) {
+            log.push("그러나 실패했다!");
+          } else {
+            const targetIdx = benchIdxs[Math.floor(Math.random() * benchIdxs.length)];
+            log.push(`${defenderName}${josa(defenderName, "은는")} 강제로 돌아갔다!`);
+            switchIn(room, oppKey, entries, activeIdx, targetIdx, log, events, update, false);
+          }
+        }
+
         // 전멸/교체 체크 (직접 데미지로 쓰러진 경우)
         const faint = handleFaintSwitch(entries, oppKey, activeIdx);
         if (faint.fainted) {
@@ -805,6 +862,12 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     entries[myKey][activeIdx[myKey]] = { ...cur, moveLock: { name: moveSlot.name, turn: currentTurn + 1 } };
   }
 
+  // 카운터: 실제로 기술을 썼으면(빗나가거나 막혀도) 저장된 피격 데미지를 소모
+  if (moveData.counter && !blocked) {
+    const cur = entries[myKey][activeIdx[myKey]];
+    if (cur.lastDamageTaken) entries[myKey][activeIdx[myKey]] = { ...cur, lastDamageTaken: 0 };
+  }
+
   const pendingSides = new Set(directPendingSide ? [directPendingSide] : []);
 
   // 유턴: 기술을 쓴 뒤(빗나가거나 막혀도) 곧바로 교체. 행동이 저지됐거나 내가 쓰러졌으면 교체 없음.
@@ -840,9 +903,9 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   return ok(update);
 }
 
-// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발)
+// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발/카운터용 피격 데미지)
 function clearOnSwitchOut(pokemon) {
-  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null };
+  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null, lastDamageTaken: 0 };
 }
 
 // 교체 공통 처리(자발적 교체/강제 교체/유턴): 나가는 포켓몬 상태 정리 -> 내보내기 로그/연출 -> 장판 적용.

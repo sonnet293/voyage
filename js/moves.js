@@ -120,6 +120,8 @@ export const MOVES = {
   "퀵턴": { power: 40, type: "물", accuracy: 100, alwaysHit: false,
           effect: null, uTurn: true },
   "집게해머":         { power: 50, type: "물", accuracy: 95, alwaysHit: false, effect: null, highCrit: true },
+  "물수리검":   { power: 15, type: "물", accuracy: 100, alwaysHit: false, effect: null,
+                  multiHit: { min: 2, max: 5 } },
 
   // ───── 전기 ─────
   "번개펀치":     { power: 45, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.1, status: "마비" } },
@@ -190,7 +192,7 @@ export const MOVES = {
                           rank: { def: -1, turns: 2 } },
   "파동탄":             { power: 40, type: "격투", accuracy: 100, alwaysHit: true,  effect: null },
   "기합구슬":             { power: 60, type: "격투", accuracy: 70, alwaysHit: false,  effect: null, rank: { chance: 0.1, targetDef: -1, turns: 2 }   },
-  "깨트리기":           { power: 45, type: "격투", accuracy: 100, alwaysHit: false, effect: null, breakBarrier: true },
+  "깨트리기":           { power: 50, type: "격투", accuracy: 100, alwaysHit: false, effect: null, breakBarrier: true },
   "그로우펀치": { power: 30, type: "격투", accuracy: 100, alwaysHit: false, effect: null, rank: { atk: 1, turns: 2} },
   "드레인펀치":         { power: 45, type: "격투", accuracy: 100, alwaysHit: false, effect: { drain: 0.15 } },
   "바디프레스":         { power: 50, type: "격투", accuracy: 100, alwaysHit: false, effect: null, bodyPress: true },
@@ -346,6 +348,7 @@ export const MOVES = {
   "물기":         { power: 40, type: "악", accuracy: 100, alwaysHit: false,
                     effect: { chance: 0.3, volatile: "풀죽음" } },
   "탁쳐서떨구기":   { power: 50, type: "악", accuracy: 100, alwaysHit: false, effect: null },
+  "도각참":   { power: 60, type: "악", accuracy: 100, alwaysHit: true, effect: null },
   "세차게휘두르기":{ power: 40, type: "악", accuracy: 100, alwaysHit: false, effect: null, aoe: true },
   "바크아웃":     { power: 40,  type: "악", accuracy: 95,  alwaysHit: false, effect: null,
                     rank: { targetAtk: -1, turns: 3 }, aoeEnemy: true },
