@@ -131,6 +131,13 @@
 
         </div>
 
+    <!--BGM 음량 조절-->
+    <div id="bgm-volume-control">
+        <button id="bgm-mute-btn" type="button" aria-label="음소거">🔊</button>
+        <input type="range" id="bgm-volume" min="0" max="1" step="0.05" value="0.7" aria-label="BGM 음량" />
+        <span id="bgm-volume-label">70%</span>
+    </div>
+
     <script>
         const ROOM_ID = "battleroom1";
     </script>
