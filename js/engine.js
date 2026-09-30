@@ -474,6 +474,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   const update = {};
   let directPendingSide = null;
   let furyCutterHit = false; // 이번 연속자르기가 실제로 맞았는지
+  let moveConnected = false; // 이번 기술이 상대에게 명중했는지 (빗나감/회피/방어/사라짐/타입 무효가 아님) - 유턴류 교체 판정용
   let guardSucceeded = false; // 이번에 방어류 기술이 성공했는지 (연속 사용 판정용)
   const defGuard = activeGuard(defender, currentTurn);
 
@@ -656,6 +657,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
         const weatherMult = weatherPowerMultiplier(currentWeather?.type, moveData.type);
 
         let updatedDefender = { ...defender };
+        moveConnected = typeMult > 0;
 
         // 깨트리기: 공격이 맞으면 데미지 계산 전에 상대의 빛의장막/리플렉터를 깨뜨림 (타입상 효과가 없으면 깨지 못함)
         if (moveData.breakBarrier && updatedDefender.screen && typeMult > 0) {
@@ -870,8 +872,8 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
 
   const pendingSides = new Set(directPendingSide ? [directPendingSide] : []);
 
-  // 유턴: 기술을 쓴 뒤(빗나가거나 막혀도) 곧바로 교체. 행동이 저지됐거나 내가 쓰러졌으면 교체 없음.
-  if (moveData.uTurn && !blocked && myBenchAlive && Number.isInteger(uTurnIdx) && entries[myKey][activeIdx[myKey]].hp > 0) {
+  // 유턴: 상대에게 명중했을 때만 곧바로 교체. 빗나감/회피/방어/사라진 상대/타입 무효, 행동 저지, 내가 쓰러졌으면 교체 없음.
+  if (moveData.uTurn && moveConnected && myBenchAlive && Number.isInteger(uTurnIdx) && entries[myKey][activeIdx[myKey]].hp > 0) {
     const hazardFaint = switchIn(room, myKey, entries, activeIdx, uTurnIdx, log, events, update, true);
     if (hazardFaint.fainted) {
       log.push(`${hazardFaint.name}${josa(hazardFaint.name, "은는")} 쓰러졌다!`);
