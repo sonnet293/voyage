@@ -209,7 +209,7 @@ export function checkConfusionInterrupt(pokemon) {
     volatiles: { ...pokemon.volatiles, "혼란": { ...confusionData, turnCount } },
   };
   
-  if (Math.random() < 0.20) {
+  if (Math.random() < 0.15) {
     const selfDamage = (pokemon.atk ?? 0) * 2;
     const newHp = Math.max(0, pokemon.hp - selfDamage);
     return {
