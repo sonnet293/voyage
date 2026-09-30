@@ -903,9 +903,10 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   return ok(update);
 }
 
-// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발/카운터용 피격 데미지)
+// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발/카운터용 피격 데미지/혼란·풀죽음)
 function clearOnSwitchOut(pokemon) {
-  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null, lastDamageTaken: 0 };
+  const { "혼란": _confusion, "풀죽음": _flinch, ...volatiles } = pokemon.volatiles ?? {};
+  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null, lastDamageTaken: 0, volatiles };
 }
 
 // 교체 공통 처리(자발적 교체/강제 교체/유턴): 나가는 포켓몬 상태 정리 -> 내보내기 로그/연출 -> 장판 적용.

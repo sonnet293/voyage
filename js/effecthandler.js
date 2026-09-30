@@ -216,7 +216,7 @@ export function checkConfusionInterrupt(pokemon) {
       confused: true,
       pokemon: { ...updatedPokemon, hp: newHp },
       selfDamage,
-      message: `${pokemon.name}${josa(pokemon.name, "은는")} 영문도 모른 채 자신을 공격했다! (${selfDamage})`,
+      message: `${pokemon.name}${josa(pokemon.name, "은는")} 영문도 모른 채 자신을 공격했다!`,
     };
   }
   
