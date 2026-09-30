@@ -180,7 +180,7 @@ export function checkActionPrevented(pokemon) {
 }
 
 // checkActionPrevented에서 canAct: true가 나온 후, 혼란이면 한 번 더 체크.
-// 40% 확률로 기술이 취소되고 자기 자신을 (atk * 2) 고정 데미지로 공격함.
+// 33% 확률로 기술이 취소되고 자기 자신을 (atk * 2) 고정 데미지로 공격함.
 // 반환: { confused: boolean, pokemon: 갱신된 포켓몬, selfDamage, message }
 export function checkConfusionInterrupt(pokemon) {
   const confusionData = pokemon.volatiles?.["혼란"];
@@ -209,7 +209,7 @@ export function checkConfusionInterrupt(pokemon) {
     volatiles: { ...pokemon.volatiles, "혼란": { ...confusionData, turnCount } },
   };
   
-  if (Math.random() < 0.4) {
+  if (Math.random() < 0.33) {
     const selfDamage = (pokemon.atk ?? 0) * 2;
     const newHp = Math.max(0, pokemon.hp - selfDamage);
     return {
