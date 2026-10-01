@@ -41,7 +41,12 @@ body {
     flex: 0 0 40%;
     display: flex;
     flex-direction: column;
+    justify-content: flex-start;
     align-items: center;
+}
+
+.mine-col .name {
+    align-self: flex-start;
 }
 
 .turn-info {

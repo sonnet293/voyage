@@ -6,7 +6,7 @@
 // 필드 상태는 room 문서에 사이드별로 저장한다 (예: p1_field, p2_field):
 //   { stealth_rock: boolean, toxic_spikes: boolean }
 
-import { getTypeMultiplier } from "./typeChart.js";
+import { getTypeMultiplier, pokemonTypes } from "./typeChart.js";
 import { applyStatus, josa } from "./effecthandler.js";
 
 export const FIELD_LIST = ["stealth_rock", "toxic_spikes"];
@@ -16,7 +16,7 @@ export function defaultField() {
 }
 
 function hasType(pokemon, typeName) {
-  return Array.isArray(pokemon?.types) && pokemon.types.includes(typeName);
+  return pokemonTypes(pokemon).includes(typeName);
 }
 
 // 방어 포켓몬의 다중 타입에 대해 바위 타입 배율을 모두 곱함
@@ -62,7 +62,7 @@ export function applyHazardsOnSwitchIn(pokemon, field, currentTurn) {
   let updated = pokemon;
 
   if (field.stealth_rock) {
-    const mult = getRockMultiplier(updated.types);
+    const mult = getRockMultiplier(pokemonTypes(updated));
     const ratio = stealthRockDamageRatio(mult);
     if (ratio > 0) {
       const dmg = Math.max(1, Math.floor(updated.maxHp * ratio));
