@@ -29,10 +29,10 @@ function getRockMultiplier(defenderTypes) {
 function stealthRockDamageRatio(mult) {
   if (mult <= 0) return 0; // 무효 타입 (없긴 하지만 안전장치)
   if (mult <= 0.6) return 1 / 32; // 0.8*0.8
-  if (mult <= 0.9) return 1 / 27; // 0.8
-  if (mult <= 1.1) return 1 / 20; // 1배 (0.96 포함)
-  if (mult <= 1.3) return 1 / 16; // 1.2
-  return 1 / 10; // 1.2*1.2
+  if (mult <= 0.9) return 1 / 16; // 0.8
+  if (mult <= 1.1) return 1 / 8; // 1배 (0.96 포함)
+  if (mult <= 1.3) return 1 / 4; // 1.2
+  return 1 / 2; // 1.2*1.2
 }
 
 // 장판 설치 시도. 이미 설치되어 있으면 실패.
