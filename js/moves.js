@@ -91,6 +91,7 @@ export const MOVES = {
                       rank: { chance:0.5, atk: 1, turns: 3 } },
   "불꽃튀기기":     { power: 40, type: "불", accuracy: 100, alwaysHit: false, effect: null, sparks: true  },
   "화염방사":       { power: 50, type: "불", accuracy: 100, alwaysHit: false, effect: { chance: 0.1, status: "화상" } },
+  "회오리불꽃":     { power: 35, type: "불", accuracy: 85,  alwaysHit: false, effect: null, trap: true },
   "열사의대지":     { power: 40, type: "땅", accuracy: 100, alwaysHit: false, effect: { chance: 0.3, status: "화상" } },
   "플레어드라이브": { power: 70, type: "불", accuracy: 100, alwaysHit: false, effect: { recoil: 0.33, chance: 0.1, status: "화상" } },
   "오버히트":   { power: 70, type: "불", accuracy: 100, alwaysHit: false, effect: null, targetSelf:true, rank: { atk: -1, turns: 3 } },
@@ -283,7 +284,7 @@ export const MOVES = {
   "어시스트파워":   { power: 30, type: "에스퍼", accuracy: 100, alwaysHit: false, effect: null, assistPower: true },
   "회복봉인":       { power: 0,  type: "에스퍼", accuracy: 100, alwaysHit: true,  effect: null,
                       healBlock: true, targetSelf: false, aoeEnemy: true },
-  "미래예지":       { power: 0,  type: "에스퍼", accuracy: 100, alwaysHit: true,  effect: null, futureSight: true },
+  "미래예지":       { power: 70, type: "에스퍼", accuracy: 100, alwaysHit: true,  effect: null, futureSight: true },
   "사이코팽":       { power: 50, type: "에스퍼", accuracy: 100, alwaysHit: false, effect: null, breakBarrier: true },
 
   // ───── 벌레 ─────
@@ -365,6 +366,7 @@ export const MOVES = {
   "트집":         { power: 0,  type: "악", accuracy: 100, alwaysHit: false, effect: null, torment: true, targetSelf: false },
   "추억의선물":   { power: 0,  type: "악", accuracy: 100, alwaysHit: true,  effect: null, memento: true, targetSelf: false },
   "도발":         { power: 0,  type: "악", accuracy: 100, alwaysHit: false, effect: null, taunt: true, targetSelf: false },
+  "깜짝베기":   { power: 50, type: "악", accuracy: 100, alwaysHit: false, effect: null, highCrit: true },
 
   // ───── 강철 ─────
   "아이언테일": { power: 50, type: "강철", accuracy: 75,  alwaysHit: false, effect: null,

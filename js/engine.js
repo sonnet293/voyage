@@ -40,6 +40,10 @@ export const BATTLE_RESET_FIELDS = {
   p1_field: null,
   p2_field: null,
   weather: null,
+  p1_wish: null,
+  p2_wish: null,
+  p1_future_sight: null,
+  p2_future_sight: null,
   battle_turn: null,
   round_first: null,
   round_no: 0,
@@ -161,6 +165,17 @@ const VENOM_SHOCK_MULT = 1.5;
 // 트라이어택: 부가효과로 걸 수 있는 상태이상 후보
 const TRI_ATTACK_STATUSES = ["마비", "화상", "얼음"];
 
+// 미래예지: 사용한 라운드 포함 3라운드째(사용 라운드 + 2) 종료 시 공격
+const FUTURE_SIGHT_DELAY = 2;
+
+// 희망사항: 다음 라운드 종료 시 그 진영에 나와 있는 포켓몬의 최대 체력 x 비율만큼 회복
+const WISH_HEAL_RATIO = 0.15;
+
+// 회오리불꽃류(trap): 사용한 라운드 포함 4~5라운드간 라운드 종료마다 최대 체력 x 비율 데미지, 그동안 교체 불가
+const TRAP_MIN_TURNS = 4;
+const TRAP_MAX_TURNS = 5;
+const TRAP_DAMAGE_RATIO = 1 / 16;
+
 // 방어류(방어/판별/니들가드): 사용한 라운드 포함 2라운드 유지, 직전 행동도 방어류 성공이었으면 성공률 45%
 const GUARD_TURNS = 2;
 const GUARD_REPEAT_CHANCE = 0.33;
@@ -242,6 +257,17 @@ function handleFaintSwitch(entries, sideKey, activeIdx) {
   return { fainted: true, allFainted: !hasAliveBench, name };
 }
 
+// 미래예지 데미지: 사용 당시 공격자의 공격력/타입으로 계산 (랭크 보정/급소 없음). 맞는 쪽은 지금 필드의 포켓몬.
+function futureSightDamage(fs, defender, weatherType) {
+  const typeMult = getDefenderTypeMultiplier(fs.type, pokemonTypes(defender));
+  const stab = hasStab(fs.attackerTypes ?? [], fs.type) ? 1.3 : 1;
+  const weatherMult = weatherPowerMultiplier(weatherType, fs.type);
+  const defMult = rankMultiplier(clampRank(sandstormDefenseBonus(defender, weatherType)));
+  const rawDamage = (fs.power + (fs.atk ?? 0) * 4 + rollD10()) * typeMult * stab * weatherMult - defender.def * 3 * defMult;
+  const screenMult = defender.screen ? SCREEN_DAMAGE_MULT : 1;
+  return { dmg: Math.max(0, Math.round(rawDamage * screenMult)), typeMult };
+}
+
 function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, events, alreadyPendingSides = new Set(), weather = room.weather ?? null) {
   const update = {};
 
@@ -255,6 +281,44 @@ function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, even
     return update;
   }
 
+  // 미래예지: 예약된 라운드가 됐으면(교체 대기로 라운드 종료가 건너뛰어졌으면 그다음 라운드 종료에) 지금 필드의 포켓몬을 공격
+  for (const side of ["p1", "p2"]) {
+    const fs = room[`${side}_future_sight`];
+    if (!fs || currentTurn < fs.hitTurn) continue;
+    update[`${side}_future_sight`] = null;
+    const pkmn = entries[side][activeIdx[side]];
+    if (!pkmn || pkmn.hp <= 0) continue;
+    const hit = futureSightDamage(fs, pkmn, weather?.type);
+    const n = pkmn.name ?? "포켓몬";
+    const updated = { ...pkmn, hp: Math.max(0, pkmn.hp - hit.dmg) };
+    entries[side][activeIdx[side]] = updated;
+    log.push(`${n}${josa(n, "은는")} ${fs.name} 공격을 받았다!`);
+    events.push({ logIndex: log.length - 1, type: "hit", side, hp: updated.hp, status: updated.status ?? null, hasAttacker: false });
+    if (hit.typeMult === 0) log.push(`${n}에게는 효과가 없는 듯하다...`);
+    else if (hit.typeMult > 1) log.push("효과가 굉장했다!");
+    else if (hit.typeMult < 1) log.push("효과가 별로인 듯하다...");
+  }
+
+  // 희망사항: 빈 다음 라운드 종료 시 그 진영에 나와 있는 포켓몬 회복
+  for (const side of ["p1", "p2"]) {
+    const wish = room[`${side}_wish`];
+    if (!wish || currentTurn < wish.turn) continue;
+    update[`${side}_wish`] = null;
+    const pkmn = entries[side][activeIdx[side]];
+    if (!pkmn || pkmn.hp <= 0) continue;
+    log.push(`${wish.name}의 희망사항이 이루어졌다!`);
+    const maxHp = pkmn.maxHp ?? pkmn.hp;
+    const heal = Math.min(maxHp - pkmn.hp, Math.max(1, Math.round(maxHp * WISH_HEAL_RATIO)));
+    const n = pkmn.name ?? "포켓몬";
+    if (heal > 0) {
+      entries[side][activeIdx[side]] = { ...pkmn, hp: pkmn.hp + heal };
+      log.push(`${n}의 체력이 회복되었다!`);
+      events.push({ logIndex: log.length - 1, type: "heal", side, hp: pkmn.hp + heal });
+    } else {
+      log.push(`그러나 ${n}의 체력은 가득 차 있다!`);
+    }
+  }
+
   for (const side of ["p1", "p2"]) {
     const pkmn = entries[side][activeIdx[side]];
     if (!pkmn) continue;
@@ -264,6 +328,25 @@ function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, even
       log.push(tick.message);
       events.push({ logIndex: log.length - 1, type: "hit", side, hp: tick.pokemon.hp, status: tick.pokemon.status ?? null, hasAttacker: false });
     }
+  }
+
+  // 회오리불꽃류: 갇혀 있는 동안 라운드 종료마다 데미지, 마지막 라운드 종료 시 풀려남
+  for (const side of ["p1", "p2"]) {
+    const pkmn = entries[side][activeIdx[side]];
+    if (!pkmn?.trap || pkmn.hp <= 0) continue;
+    const n = pkmn.name ?? "포켓몬";
+    let updated = pkmn;
+    if (currentTurn <= pkmn.trap.expireTurn) {
+      const damage = Math.max(1, Math.floor((pkmn.maxHp ?? pkmn.hp) * TRAP_DAMAGE_RATIO));
+      updated = { ...updated, hp: Math.max(0, updated.hp - damage) };
+      log.push(`${n}${josa(n, "은는")} ${pkmn.trap.name}의 데미지를 입었다!`);
+      events.push({ logIndex: log.length - 1, type: "hit", side, hp: updated.hp, status: updated.status ?? null, hasAttacker: false });
+    }
+    if (currentTurn >= pkmn.trap.expireTurn && updated.hp > 0) {
+      updated = { ...updated, trap: null };
+      log.push(`${n}${josa(n, "은는")} ${pkmn.trap.name}에서 벗어났다!`);
+    }
+    entries[side][activeIdx[side]] = updated;
   }
 
   // 방어류 만료: 피격되지 않았으면 사용한 라운드 포함 2라운드째 종료 시 해제
@@ -564,6 +647,36 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
       entries[myKey][activeIdx[myKey]] = currentAttacker;
       log.push(`${attackerName}${josa(attackerName, "은는")} ${moveSlot.name}${josa(moveSlot.name, "으로")} 받는 데미지가 줄어들었다!`);
     }
+  } else if (moveData.futureSight) {
+    // 미래예지: 지금은 공격하지 않고 상대 진영에 예약. FUTURE_SIGHT_DELAY 라운드 뒤 라운드 종료 시
+    // 그때 상대 필드에 나와 있는 포켓몬을 공격함 (방어류 무시). 이미 예약돼 있으면 실패.
+    const attackerName = currentAttacker.name ?? "포켓몬";
+    log.push(`${attackerName}의 ${moveSlot.name}!`);
+    const key = `${oppKey}_future_sight`;
+    if (room[key]) {
+      log.push("그러나 실패했다!");
+    } else {
+      update[key] = {
+        name: moveSlot.name,
+        hitTurn: currentTurn + FUTURE_SIGHT_DELAY,
+        power: moveData.power,
+        type: moveData.type,
+        atk: currentAttacker.atk,
+        attackerTypes: pokemonTypes(currentAttacker),
+      };
+      log.push(`${attackerName}${josa(attackerName, "은는")} 미래를 내다보았다!`);
+    }
+  } else if (moveData.wish) {
+    // 희망사항: 다음 라운드 종료 시 내 진영에 나와 있는 포켓몬(교체됐으면 교체한 포켓몬)을 회복. 이미 빌어 둔 게 있으면 실패.
+    const attackerName = currentAttacker.name ?? "포켓몬";
+    log.push(`${attackerName}의 ${moveSlot.name}!`);
+    const key = `${myKey}_wish`;
+    if (room[key]) {
+      log.push("그러나 실패했다!");
+    } else {
+      update[key] = { name: attackerName, turn: currentTurn + 1 };
+      log.push(`${attackerName}${josa(attackerName, "은는")} 소원을 빌었다!`);
+    }
   } else if (moveData.effect?.heal) {
     // 자가 회복 기술: 최대 체력 x 회복 비율(날씨에 따라 달라질 수 있음)만큼 회복
     const attackerName = currentAttacker.name ?? "포켓몬";
@@ -799,6 +912,13 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           }
         }
 
+        // 회오리불꽃류(trap): 맞은 상대를 TRAP_MIN~MAX_TURNS 라운드간 가둠 (이미 갇혀 있으면 갱신하지 않음)
+        if (moveData.trap && moveData.power > 0 && typeMult > 0 && updatedDefender.hp > 0 && !updatedDefender.trap) {
+          const turns = TRAP_MIN_TURNS + Math.floor(Math.random() * (TRAP_MAX_TURNS - TRAP_MIN_TURNS + 1));
+          updatedDefender = { ...updatedDefender, trap: { name: moveSlot.name, expireTurn: currentTurn + turns - 1 } };
+          log.push(`${defenderName}${josa(defenderName, "은는")} ${moveSlot.name}에 갇혔다!`);
+        }
+
         // 도발: 다음 라운드부터 TAUNT_TURNS 라운드간 공격 기술만 사용 가능. 이미 걸려 있으면 실패.
         if (moveData.taunt) {
           if (updatedDefender.taunt && currentTurn <= updatedDefender.taunt.expireTurn) {
@@ -930,8 +1050,9 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     }
   }
 
+  // 이번 행동에서 바뀐 room 필드(미래예지/희망사항 예약 등)를 반영해서 라운드 종료 처리
   const advance = buildTurnAdvanceUpdate(
-    room, entries, activeIdx, currentTurn, log, events,
+    { ...room, ...update }, entries, activeIdx, currentTurn, log, events,
     pendingSides.size > 0 ? pendingSides : undefined,
     currentWeather
   );
@@ -944,10 +1065,10 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   return ok(update);
 }
 
-// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발/카운터용 피격 데미지/혼란·풀죽음)
+// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발/카운터용 피격 데미지/회오리불꽃류/혼란·풀죽음)
 function clearOnSwitchOut(pokemon) {
   const { "혼란": _confusion, "풀죽음": _flinch, ...volatiles } = pokemon.volatiles ?? {};
-  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null, lastDamageTaken: 0, volatiles };
+  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null, lastDamageTaken: 0, trap: null, volatiles };
 }
 
 // 교체 공통 처리(자발적 교체/강제 교체/유턴): 나가는 포켓몬 상태 정리 -> 내보내기 로그/연출 -> 장판 적용.
@@ -1002,6 +1123,8 @@ export function switchPokemon(room, myKey, targetIdx) {
   if (!target || target.hp <= 0) return fail("쓰러진 포켓몬"); // 쓰러진 포켓몬으론 못 나감
   if (!pendingSwitch && targetIdx === activeIdx[myKey]) return fail("이미 출전 중"); // 이미 나가 있는 포켓몬
   if (!pendingSwitch && myArr[activeIdx[myKey]]?.ghostDive) return fail("고스트다이브 중에는 교체 불가");
+  const trap = myArr[activeIdx[myKey]]?.trap;
+  if (!pendingSwitch && trap) return fail(`${trap.name}에 갇혀 있어 교체 불가`);
 
   const update = {};
   const log = [...(room.battle_log ?? [])];

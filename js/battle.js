@@ -444,6 +444,7 @@ function renderBenchSide(dataKey, uiKey, room) {
     !pendingSwitch &&
     !anyonePending &&
     !entry[activeIdx]?.ghostDive &&
+    !entry[activeIdx]?.trap && // 회오리불꽃류에 갇혀 있으면 자발적 교체 불가
     !room.battle_winner &&
     !isAnimating &&
     !actionInFlight &&
