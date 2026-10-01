@@ -165,8 +165,8 @@ const VENOM_SHOCK_MULT = 1.5;
 // 트라이어택: 부가효과로 걸 수 있는 상태이상 후보
 const TRI_ATTACK_STATUSES = ["마비", "화상", "얼음"];
 
-// 미래예지: 사용한 라운드 포함 3라운드째(사용 라운드 + 2) 종료 시 공격
-const FUTURE_SIGHT_DELAY = 2;
+// 미래예지: 사용한 라운드 포함 2라운드째(사용 라운드 + 1) 종료 시 공격
+const FUTURE_SIGHT_DELAY = 1;
 
 // 희망사항: 다음 라운드 종료 시 그 진영에 나와 있는 포켓몬의 최대 체력 x 비율만큼 회복
 const WISH_HEAL_RATIO = 0.4;
