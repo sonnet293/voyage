@@ -155,6 +155,12 @@ const SCREEN_DAMAGE_MULT = 0.75;
 // 카운터: 직전에 받은 데미지(lastDamageTaken)에 곱하는 배율
 const COUNTER_MULT = 1.5;
 
+// 베놈쇼크: 독 상태인 상대에게 곱하는 위력 배율
+const VENOM_SHOCK_MULT = 1.5;
+
+// 트라이어택: 부가효과로 걸 수 있는 상태이상 후보
+const TRI_ATTACK_STATUSES = ["마비", "화상", "얼음"];
+
 // 방어류(방어/판별/니들가드): 사용한 라운드 포함 2라운드 유지, 직전 행동도 방어류 성공이었으면 성공률 45%
 const GUARD_TURNS = 2;
 const GUARD_REPEAT_CHANCE = 0.33;
@@ -472,7 +478,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   const log = [...(room.battle_log ?? [])];
   const events = [...(room.battle_event_log ?? [])];
   const update = {};
-  let directPendingSide = null;
+  const directPendingSides = new Set(); // 이번 행동으로 쓰러져 교체 대기가 된 쪽 (반동기로 양쪽 모두 쓰러질 수 있음)
   let furyCutterHit = false; // 이번 연속자르기가 실제로 맞았는지
   let moveConnected = false; // 이번 기술이 상대에게 명중했는지 (빗나감/회피/방어/사라짐/타입 무효가 아님) - 유턴류 교체 판정용
   let guardSucceeded = false; // 이번에 방어류 기술이 성공했는지 (연속 사용 판정용)
@@ -521,7 +527,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
       }
       update[`${myKey}_pending_switch`] = true;
       log.push(`${faint.name}${josa(faint.name, "은는")} 쓰러졌다!`);
-      directPendingSide = myKey;
+      directPendingSides.add(myKey);
     }
   } else if (moveData.ghostDive && !diving) {
     // 고스트다이브 1턴째: 공격하지 않고 사라짐. 다음 내 턴에 같은 기술로 강제 공격.
@@ -612,7 +618,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
         return ok(update);
       }
       update[`${myKey}_pending_switch`] = true;
-      directPendingSide = myKey;
+      directPendingSides.add(myKey);
     }
   } else if (defender.ghostDive && targetsOpponent(moveData)) {
     // 상대가 고스트다이브로 사라져 있으면 상대를 노리는 기술은 반드시 빗나감
@@ -672,6 +678,8 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           // 눈사태: 이번 라운드에 상대의 공격 기술(위력>0)에 맞았으면 위력 70
           let power = moveData.power;
           if (moveData.avalanche && attacker.lastHitRound === currentTurn) power = 70;
+          // 베놈쇼크: 상대가 독 상태면 위력 1.5배
+          if (moveData.venomShock && defender.status === "독") power = Math.round(power * VENOM_SHOCK_MULT);
           // 연속자르기: 연속으로 맞힐 때마다 +10 (30 -> 40 -> 50, 최대 50)
           if (moveData.furyCutter) {
             power = Math.min(FURY_CUTTER_MAX_POWER, moveData.power + 10 * (attacker.furyCutter ?? 0));
@@ -733,6 +741,16 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
               events.push({ logIndex: log.length - 1, type: "heal", side: myKey, hp: currentAttacker.hp });
             }
           }
+
+          // 반동기(effect.recoil): 상대에게 준 데미지의 recoil 비율만큼 자신도 데미지 (쓰러짐 처리는 아래 전멸/교체 체크 뒤에서)
+          if (moveData.effect?.recoil && dmg > 0) {
+            const recoilDmg = Math.max(1, Math.round(dmg * moveData.effect.recoil));
+            currentAttacker = { ...currentAttacker, hp: Math.max(0, currentAttacker.hp - recoilDmg) };
+            entries[myKey][activeIdx[myKey]] = currentAttacker;
+            const an = currentAttacker.name ?? "포켓몬";
+            log.push(`${an}${josa(an, "은는")} 반동으로 데미지를 입었다!`);
+            events.push({ logIndex: log.length - 1, type: "hit", side: myKey, hp: currentAttacker.hp, status: currentAttacker.status ?? null, hasAttacker: false });
+          }
         }
 
         // 장판(스텔스록/독압정) 설치. 설치 당시엔 데미지/효과 없이 상대 진영에 표시만 해둠.
@@ -753,11 +771,15 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
 
         // 상태이상 / 상태변화 부여 시도
         if (moveData.effect && Math.random() < moveData.effect.chance) {
-          if (moveData.effect.status) {
-            if (moveData.effect.status === "얼음" && preventsFreeze(currentWeather?.type)) {
+          // 트라이어택(effect.triAttack): 마비/화상/얼음 중 랜덤 하나
+          const statusName = moveData.effect.triAttack
+            ? TRI_ATTACK_STATUSES[Math.floor(Math.random() * TRI_ATTACK_STATUSES.length)]
+            : moveData.effect.status;
+          if (statusName) {
+            if (statusName === "얼음" && preventsFreeze(currentWeather?.type)) {
               // 쾌청 상태에서는 얼음 상태이상에 걸리지 않음
             } else {
-              const statusResult = applyStatus(updatedDefender, moveData.effect.status, currentTurn);
+              const statusResult = applyStatus(updatedDefender, statusName, currentTurn);
               updatedDefender = statusResult.pokemon;
               if (statusResult.message) log.push(statusResult.message);
               // 상태이상이 걸린 그 로그 줄에서 바로 이름 옆 [상태] 표시를 갱신하도록 연출 이벤트를 남김
@@ -841,7 +863,24 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           }
           update[`${oppKey}_pending_switch`] = true;
           log.push(`${faint.name}${josa(faint.name, "은는")} 쓰러졌다!`);
-          directPendingSide = oppKey;
+          directPendingSides.add(oppKey);
+        }
+
+        // 반동으로 자신이 쓰러진 경우 (상대가 먼저 전멸했으면 위에서 이미 승리 처리됨)
+        const selfFaint = handleFaintSwitch(entries, myKey, activeIdx);
+        if (selfFaint.fainted) {
+          log.push(`${selfFaint.name}${josa(selfFaint.name, "은는")} 쓰러졌다!`);
+          if (selfFaint.allFainted) {
+            update.battle_winner = oppKey;
+            log.push(`${displayName(oppKey, room)} 승리!`);
+            update[`${myKey}_entry`] = entries[myKey];
+            update[`${oppKey}_entry`] = entries[oppKey];
+            update.battle_log = log;
+            update.battle_event_log = events;
+            return ok(update);
+          }
+          update[`${myKey}_pending_switch`] = true;
+          directPendingSides.add(myKey);
         }
       }
     }
@@ -870,7 +909,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     if (cur.lastDamageTaken) entries[myKey][activeIdx[myKey]] = { ...cur, lastDamageTaken: 0 };
   }
 
-  const pendingSides = new Set(directPendingSide ? [directPendingSide] : []);
+  const pendingSides = new Set(directPendingSides);
 
   // 유턴: 상대에게 명중했을 때만 곧바로 교체. 빗나감/회피/방어/사라진 상대/타입 무효, 행동 저지, 내가 쓰러졌으면 교체 없음.
   if (moveData.uTurn && moveConnected && myBenchAlive && Number.isInteger(uTurnIdx) && entries[myKey][activeIdx[myKey]].hp > 0) {
