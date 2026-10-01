@@ -169,7 +169,7 @@ const TRI_ATTACK_STATUSES = ["마비", "화상", "얼음"];
 const FUTURE_SIGHT_DELAY = 2;
 
 // 희망사항: 다음 라운드 종료 시 그 진영에 나와 있는 포켓몬의 최대 체력 x 비율만큼 회복
-const WISH_HEAL_RATIO = 0.15;
+const WISH_HEAL_RATIO = 0.4;
 
 // 회오리불꽃류(trap): 사용한 라운드 포함 4~5라운드간 라운드 종료마다 최대 체력 x 비율 데미지, 그동안 교체 불가
 const TRAP_MIN_TURNS = 4;
