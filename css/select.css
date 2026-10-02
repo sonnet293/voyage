@@ -1,0 +1,139 @@
+/* 게임 시작 직후 포켓몬 선택 화면 (js/select.js가 동적으로 붙임) — 인트로 오버레이보다 위 */
+.sel-overlay {
+  --sel-ink: #344f65;
+  --sel-muted: #71899c;
+  --sel-accent: #437a9e;
+  --sel-accent-soft: #edf6fd;
+  --sel-pick: #e5533d;
+  --sel-done: #2f8f6b;
+  --sel-line: rgba(106, 151, 182, .25);
+
+  position: fixed; inset: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  background: radial-gradient(circle at 50% 30%, #2b4a63 0%, #0d1620 75%);
+  overflow-y: auto;
+  transition: opacity .5s ease;
+  font-family: "Pretendard Variable", "Pretendard", "Malgun Gothic", sans-serif;
+  color: var(--sel-ink);
+}
+.sel-overlay.leaving { opacity: 0; pointer-events: none; }
+
+.sel-panel {
+  width: min(720px, 100%);
+  margin: auto;
+  background: #fff;
+  border-radius: 24px;
+  padding: clamp(18px, 4vw, 32px);
+  box-shadow: 0 30px 80px -30px rgba(0, 0, 0, .6);
+  animation: sel-pop .35s cubic-bezier(.2, 1.3, .4, 1);
+}
+@keyframes sel-pop { from { transform: scale(.94); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.sel-head { text-align: center; }
+.sel-eyebrow { font-size: 12px; font-weight: 700; letter-spacing: .2em; color: var(--sel-accent); }
+.sel-title { margin: 6px 0 4px; font-size: clamp(1.15rem, 4vw, 1.5rem); }
+.sel-desc { margin: 0; font-size: 14px; color: var(--sel-muted); min-height: 1.4em; text-wrap: pretty; }
+
+.sel-status { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; margin: 14px 0 18px; }
+.sel-pill {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 999px;
+  font-size: 13px; font-weight: 600;
+  background: #eef2f6; color: var(--sel-muted);
+}
+.sel-pill i { width: 8px; height: 8px; border-radius: 50%; background: currentColor; animation: sel-blink 1.2s ease-in-out infinite; }
+.sel-pill[data-done="true"] { background: #e1f4ec; color: var(--sel-done); }
+.sel-pill[data-done="true"] i { animation: none; }
+@keyframes sel-blink { 50% { opacity: .25; } }
+
+/* 몬스터볼 6칸: PC 3×2 */
+.sel-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+.sel-ball {
+  position: relative;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 14px 8px 12px;
+  border: 2px solid var(--sel-line);
+  border-radius: 18px;
+  background: var(--sel-accent-soft);
+  font: inherit; color: inherit;
+  cursor: pointer;
+  transition: transform .15s ease, border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+.sel-ball:hover:not(:disabled) { transform: translateY(-2px); border-color: var(--sel-accent); }
+.sel-ball:focus-visible { outline: 3px solid var(--sel-accent); outline-offset: 2px; }
+.sel-ball:disabled { cursor: default; }
+.sel-ball:disabled:not([data-picked="true"]) { opacity: .45; }
+.sel-ball.empty { opacity: .35; }
+
+.sel-ball-art { position: relative; width: clamp(56px, 14vw, 84px); aspect-ratio: 1; }
+.sel-ball-art img { width: 100%; height: 100%; object-fit: contain; transition: transform .2s ease; user-select: none; }
+.sel-ball.empty .sel-ball-art { border-radius: 50%; border: 2px dashed var(--sel-line); }
+
+.sel-ball-order {
+  position: absolute; top: -6px; right: -10px;
+  min-width: 26px; height: 26px; padding: 0 6px;
+  display: grid; place-items: center;
+  border-radius: 999px;
+  background: var(--sel-pick); color: #fff;
+  font-size: 14px; font-weight: 800;
+  box-shadow: 0 0 0 3px #fff;
+  transform: scale(0);
+  transition: transform .18s cubic-bezier(.2, 1.5, .4, 1);
+}
+.sel-ball[data-picked="true"] {
+  border-color: var(--sel-pick);
+  background: #fff1ee;
+  box-shadow: 0 8px 20px -10px rgba(229, 83, 61, .7);
+}
+.sel-ball[data-picked="true"] .sel-ball-art img { transform: rotate(-12deg) scale(1.05); }
+.sel-ball[data-picked="true"] .sel-ball-order { transform: scale(1); }
+
+.sel-ball-name { font-weight: 700; font-size: 15px; text-align: center; word-break: keep-all; }
+.sel-ball-info { font-size: 12px; color: var(--sel-muted); font-variant-numeric: tabular-nums; }
+
+/* 출전 순서 슬롯 */
+.sel-sub { margin: 22px 0 10px; font-size: 13px; letter-spacing: .08em; color: var(--sel-muted); }
+.sel-slots { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.sel-slot {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 10px;
+  border: 2px dashed var(--sel-line);
+  border-radius: 14px;
+  min-width: 0;
+}
+.sel-slot[data-filled="true"] { border-style: solid; border-color: var(--sel-accent); background: var(--sel-accent-soft); }
+.sel-slot-no {
+  flex: none;
+  font-size: 11px; font-weight: 800;
+  padding: 3px 7px; border-radius: 6px;
+  background: var(--sel-accent); color: #fff;
+}
+.sel-slot:first-child .sel-slot-no { background: var(--sel-pick); }
+.sel-slot-art { flex: none; width: 40px; height: 40px; display: grid; place-items: center; }
+.sel-slot-art img { max-width: 100%; max-height: 100%; image-rendering: pixelated; }
+.sel-slot-art img.dim { opacity: .25; filter: grayscale(1); image-rendering: auto; }
+.sel-slot-name { font-size: 14px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sel-slot[data-filled="false"] .sel-slot-name { color: var(--sel-muted); font-weight: 500; }
+
+.sel-foot { display: flex; justify-content: center; margin-top: 22px; }
+.sel-done {
+  min-width: 180px; padding: 13px 28px;
+  border: 0; border-radius: 999px;
+  background: var(--sel-accent); color: #fff;
+  font: inherit; font-size: 16px; font-weight: 800;
+  cursor: pointer;
+  transition: filter .15s ease, transform .15s ease;
+}
+.sel-done:hover:not(:disabled) { filter: brightness(1.1); transform: translateY(-1px); }
+.sel-done:disabled { opacity: .4; cursor: default; }
+.sel-done.ghost { background: #fff; color: var(--sel-accent); box-shadow: inset 0 0 0 2px var(--sel-accent); }
+
+/* 모바일: 몬스터볼 2×3, 슬롯은 세로로 */
+@media (max-width: 600px) {
+  .sel-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .sel-ball { padding: 12px 6px 10px; }
+  .sel-slots { grid-template-columns: 1fr; gap: 8px; }
+  .sel-done { width: 100%; }
+}

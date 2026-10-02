@@ -629,6 +629,8 @@ function renderLogAndBoard(room, isNewRound = false) {
   const enemyPkmn = room[`${enemyKey}_entry`]?.[enemyIdx] ?? null;
 
   if (!boardInitialized) {
+    // 포켓몬 선택 단계에선 엔트리가 아직 없으므로, 엔트리가 생긴 뒤에 처음 그린다
+    if (!room.p1_entry?.length || !room.p2_entry?.length) return;
     // 최초 렌더링(또는 재접속)은 기존 로그/보드를 연출 없이 즉시 표시
     const holdLast = isNewRound && log.length > 0;
     const visibleLog = holdLast ? log.slice(0, -1) : log;

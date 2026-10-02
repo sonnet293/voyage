@@ -24,6 +24,10 @@ import {
   useMove,
   switchPokemon,
   leaveBattle,
+  pickCount,
+  submitSelection,
+  cancelSelection,
+  finishSelection,
 } from "../js/engine.js";
 
 const LOG_MAX_LINES = 200;
@@ -57,6 +61,8 @@ function renderRooms(rooms) {
     row.className = "room-row";
     const state = room.battle_winner
       ? `종료 (${room.battle_winner} 승)`
+      : room.game_started && room.select_phase
+        ? `포켓몬 선택 중 · 완료 ${room.p1_select_action ? "O" : "X"}/${room.p2_select_action ? "O" : "X"}`
       : room.game_started
         ? `진행 중 · 라운드 ${room.round_no ?? 0} · 턴 ${room.battle_turn ?? "-"}`
         : `대기 · READY ${room.player1_ready ? "O" : "X"}/${room.player2_ready ? "O" : "X"}`;
@@ -217,11 +223,47 @@ function judge(room, action) {
       if (!sameRound) return { ok: false, reason: "지난 라운드의 요청" };
       if (!Number.isInteger(payload.targetIdx)) return { ok: false, reason: "잘못된 교체 대상" };
       return switchPokemon(room, side, payload.targetIdx);
+    case "unselect":
+      if (!isPlayer) return { ok: false, reason: "플레이어가 아님" };
+      return cancelSelection(room, side);
     case "leave":
       return leaveBattle(room, action.uid);
     default:
       return { ok: false, reason: `알 수 없는 요청: ${action.type}` };
   }
+}
+
+// 포켓몬 선택 완료 요청: users 엔트리로 검증하고, 상대도 이미 완료했으면 양쪽 요청의 picks로 배틀 엔트리를 만든다.
+// (트랜잭션 안에서 읽기만 하고 쓰기는 processAction이 한다)
+async function judgeSelect(tx, roomId, room, action, actionId) {
+  const side = sideOfUid(room, action.uid);
+  if (side !== "p1" && side !== "p2") return { ok: false, reason: "플레이어가 아님" };
+  const payload = action.payload ?? {};
+  if (payload.gameId !== room.game_started_at) return { ok: false, reason: "지난 게임의 선택" };
+
+  const oppSide = side === "p1" ? "p2" : "p1";
+  const myEntry = (await tx.get(doc(db, "users", action.uid))).data()?.entry ?? [];
+  const verdict = submitSelection(room, side, actionId, payload.picks, myEntry);
+  if (!verdict.ok) return verdict;
+
+  const oppActionId = room[`${oppSide}_select_action`];
+  if (!oppActionId) return verdict;
+
+  const [oppAction, oppUser] = await Promise.all([
+    tx.get(doc(db, "rooms", roomId, "actions", oppActionId)),
+    tx.get(doc(db, "users", room[`${oppSide === "p1" ? "player1" : "player2"}_uid`])),
+  ]);
+  const oppEntry = oppUser.data()?.entry ?? [];
+  const oppPicks = oppAction.data()?.payload?.picks;
+  if (!Array.isArray(oppPicks) || oppPicks.length !== pickCount(oppEntry)) {
+    // 상대 선택이 그사이 엔트리 변경 등으로 무효가 됐으면 상대만 다시 고르게 한다
+    return { ok: true, update: { ...verdict.update, [`${oppSide}_select_action`]: null } };
+  }
+
+  const entries = side === "p1"
+    ? finishSelection(myEntry, payload.picks, oppEntry, oppPicks)
+    : finishSelection(oppEntry, oppPicks, myEntry, payload.picks);
+  return { ok: true, update: { ...verdict.update, ...entries } };
 }
 
 async function processAction(roomId, actionId) {
@@ -235,7 +277,11 @@ async function processAction(roomId, actionId) {
     if (!action || action.status !== "pending") return null;
 
     const room = roomSnap.data();
-    const verdict = room ? judge(room, action) : { ok: false, reason: "방 없음" };
+    const verdict = !room
+      ? { ok: false, reason: "방 없음" }
+      : action.type === "select"
+        ? await judgeSelect(tx, roomId, room, action, actionId)
+        : judge(room, action);
 
     if (verdict.ok) {
       tx.update(roomRef, verdict.update);
@@ -249,11 +295,13 @@ async function processAction(roomId, actionId) {
   if (!result) return;
   const { action, verdict, side } = result;
   const who = `${roomId}/${side ?? "?"}`;
-  if (verdict.ok) gmLog(`${who} ${action.type} ${JSON.stringify(action.payload ?? {})} 처리`);
+  // 선택 내용(picks)은 로그에도 남기지 않음
+  const shown = action.type === "select" ? "" : ` ${JSON.stringify(action.payload ?? {})}`;
+  if (verdict.ok) gmLog(`${who} ${action.type}${shown} 처리`);
   else gmLog(`${who} ${action.type} 거절: ${verdict.reason}`, "warn");
 }
 
-// 양쪽 READY -> users 문서에서 엔트리를 읽어 게임 시작
+// 양쪽 READY -> 양쪽 users 엔트리가 있는지 확인하고 게임 시작(포켓몬 선택 단계로)
 async function maybeStartGame(roomId, room) {
   if (!room.player1_ready || !room.player2_ready || room.game_started) return;
   if (startInFlight.has(roomId)) return;
@@ -268,7 +316,8 @@ async function maybeStartGame(roomId, room) {
         tx.get(doc(db, "users", fresh.player1_uid)),
         tx.get(doc(db, "users", fresh.player2_uid)),
       ]);
-      const verdict = startGame(fresh, u1.data()?.entry, u2.data()?.entry);
+      if (!u1.data()?.entry?.length || !u2.data()?.entry?.length) return false;
+      const verdict = startGame(fresh);
       if (!verdict.ok) return false;
       tx.update(roomRef, verdict.update);
       return true;

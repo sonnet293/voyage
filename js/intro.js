@@ -3,6 +3,7 @@
 import { auth, db } from "./firebase.js"
 import { onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js"
 import { doc, getDoc, updateDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"
+import { runSelection } from "./select.js"
 
 const BGM_LIST = [
   "../bgm/bgm1.mp3",
@@ -62,6 +63,9 @@ function wait(ms) { return new Promise(r => setTimeout(r, ms)) }
 onAuthStateChanged(auth, async (user) => {
   if (!user) return
   myUid = user.uid
+
+  // 게임 시작 직후엔 먼저 포켓몬 선택 화면 (이미 끝났으면 바로 넘어감)
+  await runSelection({ roomRef, myUid, spectator: isSpectatorParam })
 
   if (isSpectatorParam) {
     skipIntro()

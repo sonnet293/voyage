@@ -55,7 +55,13 @@ export const BATTLE_RESET_FIELDS = {
   intro_ready_p1: false,
   intro_ready_p2: false,
   intro_done: false,
+  select_phase: false,
+  p1_select_action: null,
+  p2_select_action: null,
 };
+
+// 게임 시작 후 각자 users 엔트리(최대 6마리) 중에서 출전시킬 포켓몬 수
+export const SELECT_COUNT = 3;
 
 const ok = (update) => ({ ok: true, update });
 const fail = (reason) => ({ ok: false, reason });
@@ -443,18 +449,21 @@ function buildNextRound(entries, activeIdx, currentTurn, log) {
   };
 }
 
-// 양쪽 READY -> 게임 시작. entries는 users 문서에서 읽어 온 각 플레이어의 엔트리.
-export function startGame(room, p1Entry, p2Entry) {
+// 양쪽 READY -> 게임 시작. 바로 배틀에 들어가지 않고 포켓몬 선택 단계(select_phase)부터 진행한다.
+// 각자 고른 내용은 select 요청(action) 문서에만 남기고, 방 문서엔 "완료했는지"(요청 id)만 기록해서 상대에게 숨긴다.
+export function startGame(room) {
   if (!room.player1_ready || !room.player2_ready || room.game_started) return fail("시작 조건 아님");
   if (!room.player1_uid || !room.player2_uid) return fail("플레이어 부족");
-  const withMax = (entry) => (entry ?? []).map((pkmn) => ({ ...pkmn, maxHp: pkmn.hp }));
   return ok({
-    p1_entry: withMax(p1Entry),
-    p2_entry: withMax(p2Entry),
+    p1_entry: null,
+    p2_entry: null,
     p1_active_idx: 0,
     p2_active_idx: 0,
     game_started: true,
     game_started_at: Date.now(),
+    select_phase: true,
+    p1_select_action: null,
+    p2_select_action: null,
     // 새 게임마다 인트로(양쪽 터치 → VS 연출)를 처음부터 다시 진행
     intro_ready_p1: false,
     intro_ready_p2: false,
@@ -462,10 +471,48 @@ export function startGame(room, p1Entry, p2Entry) {
   });
 }
 
+// 엔트리 크기에 따라 골라야 하는 수 (엔트리가 3마리보다 적으면 전부)
+export function pickCount(entry) {
+  return Math.min(SELECT_COUNT, entry?.length ?? 0);
+}
+
+function validPicks(entry, picks) {
+  if (!Array.isArray(picks) || picks.length !== pickCount(entry) || picks.length === 0) return false;
+  if (new Set(picks).size !== picks.length) return false;
+  return picks.every((i) => Number.isInteger(i) && i >= 0 && i < entry.length && entry[i]);
+}
+
+// 선택 완료 요청. actionId(요청 문서)에 picks가 담겨 있으므로 방에는 그 id만 남긴다.
+export function submitSelection(room, side, actionId, picks, entry) {
+  if (!room.game_started || !room.select_phase) return fail("선택 단계가 아님");
+  if (room[`${side}_select_action`]) return fail("이미 선택 완료");
+  if (!validPicks(entry ?? [], picks)) return fail("잘못된 선택");
+  return ok({ [`${side}_select_action`]: actionId });
+}
+
+export function cancelSelection(room, side) {
+  if (!room.game_started || !room.select_phase) return fail("선택 단계가 아님");
+  if (!room[`${side}_select_action`]) return fail("선택 완료 상태가 아님");
+  return ok({ [`${side}_select_action`]: null });
+}
+
+// 양쪽 선택이 끝나면 고른 순서대로 배틀 엔트리를 만든다 (첫 번째가 선봉).
+export function finishSelection(p1Entry, p1Picks, p2Entry, p2Picks) {
+  const build = (entry, picks) => picks.map((i) => ({ ...entry[i], maxHp: entry[i].hp }));
+  return {
+    select_phase: false,
+    p1_entry: build(p1Entry, p1Picks),
+    p2_entry: build(p2Entry, p2Picks),
+    p1_active_idx: 0,
+    p2_active_idx: 0,
+  };
+}
+
 // 게임이 막 시작됐는데 아직 선공이 안 정해졌으면 첫 라운드 세팅.
 // round_no로 판단(battle_turn만 보면 강제교체 대기 중의 null 상태와 구분이 안 돼서 재시작 취급될 수 있음).
 export function initRound(room) {
   if (!room.game_started || (room.round_no ?? 0) > 0 || room.battle_winner) return fail("이미 시작된 라운드");
+  if (room.select_phase || !room.p1_entry?.length || !room.p2_entry?.length) return fail("포켓몬 선택이 끝나지 않음");
 
   const p1Active = room.p1_entry?.[room.p1_active_idx ?? 0];
   const p2Active = room.p2_entry?.[room.p2_active_idx ?? 0];
