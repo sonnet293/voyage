@@ -178,7 +178,7 @@ export const MOVES = {
   "광합성":           { power: 0,  type: "풀", accuracy: 100, alwaysHit: true,
                       effect: { heal: { default: 0.25, "쾌청": 0.3, "비": 0.2, "싸라기눈": 0.2, "모래바람": 0.2 } }, targetSelf: true },
   "휘적휘적포":       { power: 50, type: "풀", accuracy: 90, alwaysHit: false, effect: { drain: 0.15, chance: 0.2, status: "화상" } },
-  "힘흡수":           { power: 0,  type: "풀", accuracy: 100, alwaysHit: false, effect: null, strengthSap: 3,
+  "힘흡수":           { power: 0,  type: "풀", accuracy: 100, alwaysHit: false, effect: null, strengthSap: 4,
                         targetSelf: false, rank: { targetAtk: -1, turns: 2 } },
   // ───── 얼음 ─────
   "눈보라":         { power: 40, type: "얼음", accuracy: 70,  alwaysHit: false, effect: { chance: 0.1, status: "얼음" }, aoeEnemy: true },
