@@ -401,7 +401,9 @@ function renderMoveButtons(room) {
     btn.style.display = "inline-flex";
     btn.style.backgroundColor = TYPE_COLORS[moveData?.type] ?? "var(--accent)";
     btn.style.opacity = usable ? "1" : "0.45";
-    const accText = moveData?.alwaysHit ? "필중" : `${moveData?.accuracy ?? "-"}%`;
+    // 날씨에 따라 명중률이 바뀌는 기술(예: 번개는 비일 때 100)은 현재 날씨 기준으로 표시
+    const accuracy = moveData?.weatherAccuracy?.[room.weather?.type] ?? moveData?.accuracy;
+    const accText = moveData?.alwaysHit ? "필중" : `${accuracy ?? "-"}%`;
     btn.innerHTML = `<span class="move-btn-name">${move.name}</span><span class="move-btn-info">PP ${move.pp} | ${accText}</span>`;
     btn.disabled = !usable;
     btn.onclick = () => {
