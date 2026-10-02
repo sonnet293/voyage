@@ -922,10 +922,11 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           if (hazardResult.message && (hazardResult.applied || moveData.power <= 0)) log.push(hazardResult.message);
         }
 
-        // 힘흡수: 상대의 공격력 수치만큼 HP 회복 (랭크 다운 전 수치 기준, 최대 체력까지)
+        // 힘흡수: 상대의 공격력 × strengthSap 배수만큼 HP 회복 (랭크 다운 전 수치 기준, 최대 체력까지)
         if (moveData.strengthSap) {
           const maxHp = currentAttacker.maxHp ?? currentAttacker.hp;
-          const heal = Math.min(maxHp - currentAttacker.hp, Math.max(0, Math.round(defender.atk ?? 0)));
+          const sapMult = typeof moveData.strengthSap === "number" ? moveData.strengthSap : 1;
+          const heal = Math.min(maxHp - currentAttacker.hp, Math.max(0, Math.round((defender.atk ?? 0) * sapMult)));
           if (heal > 0) {
             currentAttacker = { ...currentAttacker, hp: currentAttacker.hp + heal };
             entries[myKey][activeIdx[myKey]] = currentAttacker;
