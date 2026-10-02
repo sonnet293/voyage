@@ -187,14 +187,22 @@ const TRAP_MIN_TURNS = 4;
 const TRAP_MAX_TURNS = 5;
 const TRAP_DAMAGE_RATIO = 1 / 16;
 
-// 방어류(방어/판별/니들가드): 사용한 라운드 포함 2라운드 유지, 직전 행동도 방어류 성공이었으면 성공률 45%
-const GUARD_TURNS = 2;
+// 방어류(방어/판별/니들가드): 상대의 다음 행동 하나에만 유지. 그 행동에 피격되지 않으면(막을 게 없었으면) 사라짐.
+// 직전 행동도 방어류 성공이었으면 성공률 감소
 const GUARD_REPEAT_CHANCE = 0.33;
 
-// 포켓몬에 걸려 있는 방어류 상태. guard: { name: 기술명, spiky: 니들가드 여부, expireTurn } | null
-function activeGuard(pokemon, currentTurn) {
-  const guard = pokemon?.guard;
-  return guard && currentTurn <= guard.expireTurn ? guard : null;
+// 포켓몬에 걸려 있는 방어류 상태. guard: { name: 기술명, spiky: 니들가드 여부 } | null
+function activeGuard(pokemon) {
+  return pokemon?.guard ?? null;
+}
+
+// 상대가 행동을 마쳤는데 방어류가 아직 남아 있으면(피격되지 않았으면) 사라짐
+function expireUnusedGuard(entries, activeIdx, side, log) {
+  const pkmn = entries[side][activeIdx[side]];
+  if (!pkmn?.guard || pkmn.hp <= 0) return;
+  entries[side][activeIdx[side]] = { ...pkmn, guard: null };
+  const n = pkmn.name ?? "포켓몬";
+  log.push(`${n}의 ${pkmn.guard.name}${josa(pkmn.guard.name, "이가")} 풀렸다!`);
 }
 
 // 도발: 걸린 다음 라운드부터 2라운드간 공격 기술(power>0)만 사용 가능. taunt: { startTurn, expireTurn }
@@ -358,17 +366,6 @@ function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, even
       log.push(`${n}${josa(n, "은는")} ${pkmn.trap.name}에서 벗어났다!`);
     }
     entries[side][activeIdx[side]] = updated;
-  }
-
-  // 방어류 만료: 피격되지 않았으면 사용한 라운드 포함 2라운드째 종료 시 해제
-  for (const side of ["p1", "p2"]) {
-    const pkmn = entries[side][activeIdx[side]];
-    if (!pkmn?.guard || currentTurn < pkmn.guard.expireTurn) continue;
-    entries[side][activeIdx[side]] = { ...pkmn, guard: null };
-    if (currentTurn === pkmn.guard.expireTurn) {
-      const n = pkmn.name ?? "포켓몬";
-      log.push(`${n}의 ${pkmn.guard.name}${josa(pkmn.guard.name, "이가")} 풀렸다!`);
-    }
   }
 
   // 빛의장막/리플렉터 만료 (날씨와 같은 방식: 사용한 라운드 + 5라운드 뒤 라운드 종료 시 해제)
@@ -617,7 +614,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   let furyCutterHit = false; // 이번 연속자르기가 실제로 맞았는지
   let moveConnected = false; // 이번 기술이 상대에게 명중했는지 (빗나감/회피/방어/사라짐/타입 무효가 아님) - 유턴류 교체 판정용
   let guardSucceeded = false; // 이번에 방어류 기술이 성공했는지 (연속 사용 판정용)
-  const defGuard = activeGuard(defender, currentTurn);
+  const defGuard = activeGuard(defender);
 
   // 기술을 고른 뒤에야 얼음/마비/혼란으로 인한 행동 저지를 판정 (버튼은 항상 활성화된 상태로 유지)
   const gate = checkActionPrevented(currentAttacker);
@@ -672,14 +669,14 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     currentAttacker = { ...currentAttacker, ghostDive: { moveIdx } };
     entries[myKey][activeIdx[myKey]] = currentAttacker;
   } else if (moveData.spikyShield || moveData.defend) {
-    // 방어류(니들가드/방어/판별): 한 번 막거나 2라운드가 지날 때까지 유지.
+    // 방어류(니들가드/방어/판별): 상대의 다음 행동 하나에만 유지 (막으면 소모, 피격되지 않으면 사라짐).
     // 직전 행동도 방어류 성공이었으면 45% 확률로만 성공. 성공하면 기존 방어류 상태를 새것으로 교체.
     const attackerName = currentAttacker.name ?? "포켓몬";
     log.push(`${attackerName}의 ${moveSlot.name}!`);
     const chance = currentAttacker.guardStreak ? GUARD_REPEAT_CHANCE : 1;
     if (Math.random() < chance) {
       const spiky = !!moveData.spikyShield;
-      currentAttacker = { ...currentAttacker, guard: { name: moveSlot.name, spiky, expireTurn: currentTurn + GUARD_TURNS - 1 } };
+      currentAttacker = { ...currentAttacker, guard: { name: moveSlot.name, spiky } };
       entries[myKey][activeIdx[myKey]] = currentAttacker;
       guardSucceeded = true;
       log.push(spiky
@@ -1108,6 +1105,9 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     if (cur.lastDamageTaken) entries[myKey][activeIdx[myKey]] = { ...cur, lastDamageTaken: 0 };
   }
 
+  // 상대의 방어류: 이번 행동으로 막지 않았으면(피격되지 않았으면) 사라짐
+  expireUnusedGuard(entries, activeIdx, oppKey, log);
+
   const pendingSides = new Set(directPendingSides);
 
   // 유턴: 상대에게 명중했을 때만 곧바로 교체. 빗나감/회피/방어/사라진 상대/타입 무효, 행동 저지, 내가 쓰러졌으면 교체 없음.
@@ -1212,6 +1212,8 @@ export function switchPokemon(room, myKey, targetIdx) {
   // 자발적 교체는 내 턴(액션)을 소모함 ("돌아와" 로그). 강제 교체는 턴 소모 없음.
   if (pendingSwitch) update[`${myKey}_pending_switch`] = false;
   const hazardFaint = switchIn(room, myKey, entries, activeIdx, targetIdx, log, events, update, !pendingSwitch);
+  // 자발적 교체도 행동이므로 상대의 방어류는 피격 없이 사라짐
+  if (!pendingSwitch) expireUnusedGuard(entries, activeIdx, oppKey, log);
   if (hazardFaint.fainted) {
     log.push(`${hazardFaint.name}${josa(hazardFaint.name, "은는")} 쓰러졌다!`);
     if (hazardFaint.allFainted) {
