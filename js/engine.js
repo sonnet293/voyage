@@ -914,11 +914,26 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
         }
 
         // 장판(스텔스록/독압정) 설치. 설치 당시엔 데미지/효과 없이 상대 진영에 표시만 해둠.
+        // 공격기(암석액스 등)는 이미 깔려 있으면 실패 로그 없이 넘어감.
         if (moveData.field) {
           const hazardResult = setHazard(oppField, moveData.field);
           oppField = hazardResult.field;
           update[`${oppKey}_field`] = oppField;
-          if (hazardResult.message) log.push(hazardResult.message);
+          if (hazardResult.message && (hazardResult.applied || moveData.power <= 0)) log.push(hazardResult.message);
+        }
+
+        // 힘흡수: 상대의 공격력 수치만큼 HP 회복 (랭크 다운 전 수치 기준, 최대 체력까지)
+        if (moveData.strengthSap) {
+          const maxHp = currentAttacker.maxHp ?? currentAttacker.hp;
+          const heal = Math.min(maxHp - currentAttacker.hp, Math.max(0, Math.round(defender.atk ?? 0)));
+          if (heal > 0) {
+            currentAttacker = { ...currentAttacker, hp: currentAttacker.hp + heal };
+            entries[myKey][activeIdx[myKey]] = currentAttacker;
+            log.push(`${defenderName}의 힘을 흡수했다!`);
+            events.push({ logIndex: log.length - 1, type: "heal", side: myKey, hp: currentAttacker.hp });
+          } else {
+            log.push(`그러나 ${attackerName}의 체력은 가득 차 있다!`);
+          }
         }
 
         // 날씨 설치. 설치 당시엔 지속/데미지 로그 없이 시작 로그만 남김 (라운드 종료 처리는 buildTurnAdvanceUpdate에서)
