@@ -386,7 +386,7 @@ export const MOVES = {
                   rank: { chance: 0.1, targetAtk: -1, turns: 2 } },
   "불릿펀치":   { power: 40, type: "강철", accuracy: 100, alwaysHit: false, effect: null },
   "플래시캐논": { power: 40, type: "강철", accuracy: 100, alwaysHit: true,  effect: null },
-  "철제광선":   { power: 70, type: "강철", accuracy: 95,  alwaysHit: false, effect: { recoilMaxHp: 0.5 } },
+  "철제광선":   { power: 90, type: "강철", accuracy: 95,  alwaysHit: false, effect: { recoilMaxHp: 0.5 } },
   "강철날개":   { power: 50, type: "강철", accuracy: 100, alwaysHit: false,
                   effect: { chance: 0.1, def: 1, turns: 3 } },
   "금속음":     { power: 0,  type: "강철", accuracy: 85,  alwaysHit: false, effect: null,
