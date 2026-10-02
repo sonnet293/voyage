@@ -132,9 +132,14 @@ function calcBaseEvasionPercent(attackerSpd, defenderSpd) {
 }
 
 // 명중 판정 (기술 자체의 명중률만 사용). 실패하면 "빗나갔다" - 공격자 쪽 귀책.
-// weatherAccuracy: { [날씨]: 명중률 } - 해당 날씨일 때 명중률을 덮어씀 (예: 번개는 비일 때 100)
+// weatherAccuracy: { [날씨]: 명중률 } - 해당 날씨일 때 명중률을 덮어씀 (예: 폭풍은 쾌청일 때 50)
+// 필중 여부. weatherAlwaysHit: [날씨, ...] - 해당 날씨일 때 필중 (명중/회피 판정 모두 무시, 예: 번개/폭풍은 비일 때)
+function isAlwaysHit(moveData, weatherType) {
+  return !!moveData.alwaysHit || !!moveData.weatherAlwaysHit?.includes(weatherType);
+}
+
 function rollAccuracy(moveData, weatherType) {
-  if (moveData.alwaysHit) return true;
+  if (isAlwaysHit(moveData, weatherType)) return true;
   const accuracy = moveData.weatherAccuracy?.[weatherType] ?? moveData.accuracy;
   return Math.random() < accuracy / 100;
 }
@@ -806,7 +811,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     if (!accuracyHit) {
       log.push(`그러나 ${attackerName}의 공격은 빗나갔다!`);
     } else {
-      const evaded = !moveData.alwaysHit && rollEvasion(attacker, defender, oppRanks, currentTurn);
+      const evaded = !isAlwaysHit(moveData, currentWeather?.type) && rollEvasion(attacker, defender, oppRanks, currentTurn);
       const defenderName = defender.name ?? "포켓몬";
 
       if (evaded) {
@@ -905,6 +910,17 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           // 반동기(effect.recoil): 상대에게 준 데미지의 recoil 비율만큼 자신도 데미지 (쓰러짐 처리는 아래 전멸/교체 체크 뒤에서)
           if (moveData.effect?.recoil && dmg > 0) {
             const recoilDmg = Math.max(1, Math.round(dmg * moveData.effect.recoil));
+            currentAttacker = { ...currentAttacker, hp: Math.max(0, currentAttacker.hp - recoilDmg) };
+            entries[myKey][activeIdx[myKey]] = currentAttacker;
+            const an = currentAttacker.name ?? "포켓몬";
+            log.push(`${an}${josa(an, "은는")} 반동으로 데미지를 입었다!`);
+            events.push({ logIndex: log.length - 1, type: "hit", side: myKey, hp: currentAttacker.hp, status: currentAttacker.status ?? null, hasAttacker: false });
+          }
+
+          // 최대 HP 비례 반동기(effect.recoilMaxHp): 맞히면 자신의 최대 HP x recoilMaxHp만큼 데미지 (예: 철제광선)
+          if (moveData.effect?.recoilMaxHp) {
+            const maxHp = currentAttacker.maxHp ?? currentAttacker.hp;
+            const recoilDmg = Math.max(1, Math.round(maxHp * moveData.effect.recoilMaxHp));
             currentAttacker = { ...currentAttacker, hp: Math.max(0, currentAttacker.hp - recoilDmg) };
             entries[myKey][activeIdx[myKey]] = currentAttacker;
             const an = currentAttacker.name ?? "포켓몬";
