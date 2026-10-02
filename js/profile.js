@@ -7,7 +7,7 @@ import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/
 import { syncPublicProfile, loadPublicProfile } from "./publicProfile.js";
 
 const SLOT_COUNT  = 6;
-const ENTRY_SLOTS = 3;   // 1~3번 칸은 users/{uid}.entry 에서 가져옴
+const ENTRY_SLOTS = SLOT_COUNT; // users/{uid}.entry(최대 6마리)가 있는 칸은 엔트리로 표시, 없는 칸은 cardSlots
 const MAX_RESULTS = 40;
 const AVATAR_MAX  = 800; // 업로드 전 긴 변 기준 리사이즈(px)
 
