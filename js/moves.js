@@ -403,7 +403,7 @@ export const MOVES = {
   "매지컬샤인":     { power: 50, type: "페어리", accuracy: 100, alwaysHit: false, effect: null, aoeEnemy: true },
   "드레인키스":     { power: 40, type: "페어리", accuracy: 100, alwaysHit: false, effect: { drain: 0.22 } },
   "애교부리기":     { power: 0,  type: "페어리", accuracy: 100, alwaysHit: false, targetSelf: false, effect: null,
-                      rank: { targetAtk: -1, turns: 2 } },
+                      rank: { targetAtk: -2, turns: 2 } },
   "초롱초롱눈동자": { power: 0,  type: "페어리", accuracy: 100, alwaysHit: true,  targetSelf: false, effect: null,
                       rank: { targetAtk: -1, turns: 2 } },
   "달빛":           { power: 0,  type: "페어리", accuracy: 100, alwaysHit: true,

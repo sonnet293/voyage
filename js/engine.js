@@ -534,6 +534,9 @@ export function submitSelection(room, side, actionId, picks, entry) {
   if (!room.game_started || !room.select_phase) return fail("선택 단계가 아님");
   if (room[`${side}_select_action`]) return fail("이미 선택 완료");
   if (!validPicks(entry ?? [], picks)) return fail("잘못된 선택");
+  // 엔트리 데이터에 hp가 없으면 전투 계산이 깨지므로(maxHp도 hp로 정함) 선택 단계에서 거절
+  const noHp = picks.map((i) => entry[i]).find((p) => !Number.isFinite(p.hp) || p.hp <= 0);
+  if (noHp) return fail(`${noHp.name ?? "포켓몬"}의 엔트리 데이터에 hp가 없음`);
   return ok({ [`${side}_select_action`]: actionId });
 }
 
