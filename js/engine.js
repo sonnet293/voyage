@@ -431,6 +431,23 @@ function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, even
     log.push(`${n}${josa(n, "은는")} 다시 소리 기술을 쓸 수 있게 되었다!`);
   }
 
+  // 랭크 만료: 마지막 라운드 종료 시 원래대로
+  for (const side of ["p1", "p2"]) {
+    const ranks = room[`${side}_ranks`];
+    const pkmn = entries[side][activeIdx[side]];
+    if (!ranks || !pkmn || pkmn.hp <= 0) continue;
+    let newRanks = null;
+    for (const stat of ["atk", "def", "evasion"]) {
+      const data = ranks[stat];
+      if (!data || data.value === 0 || currentTurn < data.expireTurn) continue;
+      newRanks = { ...(newRanks ?? ranks), [stat]: { value: 0, expireTurn: 0 } };
+      const n = pkmn.name ?? "포켓몬";
+      const statLabel = stat === "evasion" ? "속도" : stat === "atk" ? "공격" : "방어";
+      log.push(`${n}의 ${statLabel}${josa(statLabel, "이가")} 원래대로 돌아왔다!`);
+    }
+    if (newRanks) update[`${side}_ranks`] = newRanks;
+  }
+
   // 날씨 라운드 종료 처리: 지속 로그 -> 모래바람/싸라기눈 데미지 -> (종료라면) 종료 로그
   const weatherTick = tickWeather(weather, currentTurn);
   if (weatherTick.active) {
@@ -1322,7 +1339,7 @@ export function switchPokemon(room, myKey, targetIdx) {
       Object.assign(update, buildNextRound(entries, activeIdx, room.round_no ?? 1, log));
     }
   } else {
-    Object.assign(update, buildTurnAdvanceUpdate(room, entries, activeIdx, room.round_no ?? 1, log, events));
+    Object.assign(update, buildTurnAdvanceUpdate({ ...room, ...update }, entries, activeIdx, room.round_no ?? 1, log, events));
   }
 
   update[`${myKey}_entry`] = entries[myKey];
