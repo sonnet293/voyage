@@ -173,6 +173,22 @@ const COUNTER_MULT = 1.5;
 // 베놈쇼크: 독 상태인 상대에게 곱하는 위력 배율
 const VENOM_SHOCK_MULT = 1.5;
 
+// 분함의발구르기/객기/소금물/병상첨병: 조건을 만족하면 곱하는 위력 배율
+const CONDITIONAL_POWER_MULT = 1.5;
+
+// 객기: 자신이 이 상태이상일 때 위력 증가
+const GUTS_STATUSES = ["독", "마비", "화상"];
+
+// 아쿠아링: 라운드 종료마다 최대 체력 x 비율 회복
+const AQUA_RING_HEAL_RATIO = 1 / 16;
+
+// 지옥찌르기: 맞은 다음 라운드부터 2라운드간 소리 기술 사용 불가. throatChop: { startTurn, expireTurn }
+const THROAT_CHOP_TURNS = 2;
+const SOUND_MOVES = new Set([
+  "금속음", "돌림노래", "바크아웃", "소란피기", "싫은소리", "울부짖기",
+  "울음소리", "차밍보이스", "비밀이야기", "하이퍼보이스", "매혹의보이스", "벌레의야단법석",
+]);
+
 // 트라이어택: 부가효과로 걸 수 있는 상태이상 후보
 const TRI_ATTACK_STATUSES = ["마비", "화상", "얼음"];
 
@@ -213,12 +229,19 @@ export function isTaunted(pokemon, currentTurn) {
   return !!taunt && currentTurn >= taunt.startTurn && currentTurn <= taunt.expireTurn;
 }
 
+export function isThroatChopped(pokemon, currentTurn) {
+  const tc = pokemon?.throatChop;
+  return !!tc && currentTurn >= tc.startTurn && currentTurn <= tc.expireTurn;
+}
+
 // 이번 라운드에 쓸 수 없는 기술인지.
 // - 거대해머류: moveLock: { name: 기술명, turn: 사용 불가 라운드 }
 // - 도발: 위력 0인 기술 사용 불가
+// - 지옥찌르기: 소리 기술 사용 불가
 export function isMoveLocked(pokemon, moveName, currentTurn) {
   const lock = pokemon?.moveLock;
   if (lock && lock.name === moveName && lock.turn === currentTurn) return true;
+  if (isThroatChopped(pokemon, currentTurn) && SOUND_MOVES.has(moveName)) return true;
   return isTaunted(pokemon, currentTurn) && !((MOVES[moveName]?.power ?? 0) > 0);
 }
 
@@ -349,6 +372,19 @@ function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, even
     }
   }
 
+  // 아쿠아링: 라운드 종료마다 최대 체력의 1/16 회복
+  for (const side of ["p1", "p2"]) {
+    const pkmn = entries[side][activeIdx[side]];
+    if (!pkmn?.aquaRing || pkmn.hp <= 0) continue;
+    const maxHp = pkmn.maxHp ?? pkmn.hp;
+    const heal = Math.min(maxHp - pkmn.hp, Math.max(1, Math.floor(maxHp * AQUA_RING_HEAL_RATIO)));
+    if (heal <= 0) continue;
+    entries[side][activeIdx[side]] = { ...pkmn, hp: pkmn.hp + heal };
+    const n = pkmn.name ?? "포켓몬";
+    log.push(`${n}${josa(n, "은는")} 아쿠아링으로 체력을 회복했다!`);
+    events.push({ logIndex: log.length - 1, type: "heal", side, hp: pkmn.hp + heal });
+  }
+
   // 회오리불꽃류: 갇혀 있는 동안 라운드 종료마다 데미지, 마지막 라운드 종료 시 풀려남
   for (const side of ["p1", "p2"]) {
     const pkmn = entries[side][activeIdx[side]];
@@ -384,6 +420,15 @@ function buildTurnAdvanceUpdate(room, entries, activeIdx, currentTurn, log, even
     entries[side][activeIdx[side]] = { ...pkmn, taunt: null };
     const n = pkmn.name ?? "포켓몬";
     log.push(`${n}의 도발 효과가 풀렸다!`);
+  }
+
+  // 지옥찌르기 만료: 마지막 라운드 종료 시 해제
+  for (const side of ["p1", "p2"]) {
+    const pkmn = entries[side][activeIdx[side]];
+    if (!pkmn?.throatChop || currentTurn < pkmn.throatChop.expireTurn) continue;
+    entries[side][activeIdx[side]] = { ...pkmn, throatChop: null };
+    const n = pkmn.name ?? "포켓몬";
+    log.push(`${n}${josa(n, "은는")} 다시 소리 기술을 쓸 수 있게 되었다!`);
   }
 
   // 날씨 라운드 종료 처리: 지속 로그 -> 모래바람/싸라기눈 데미지 -> (종료라면) 종료 로그
@@ -584,6 +629,9 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
 
   // 거대해머류(heavyHammer): 사용한 다음 라운드에는 같은 기술을 쓸 수 없음
   if (!diving && isMoveLocked(attacker, moveSlot.name, currentTurn)) {
+    if (isThroatChopped(attacker, currentTurn) && SOUND_MOVES.has(moveSlot.name)) {
+      return fail(`지옥찌르기 효과로 ${moveSlot.name}은(는) 사용할 수 없음`);
+    }
     return fail(isTaunted(attacker, currentTurn)
       ? `도발 상태라 ${moveSlot.name}은(는) 사용할 수 없음`
       : `${moveSlot.name}은(는) 이번 라운드에 사용할 수 없음`);
@@ -614,6 +662,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   let furyCutterHit = false; // 이번 연속자르기가 실제로 맞았는지
   let moveConnected = false; // 이번 기술이 상대에게 명중했는지 (빗나감/회피/방어/사라짐/타입 무효가 아님) - 유턴류 교체 판정용
   let guardSucceeded = false; // 이번에 방어류 기술이 성공했는지 (연속 사용 판정용)
+  let moveMissed = false; // 이번 기술이 빗나갔는지 (명중 실패/회피/사라진 상대) - 분함의발구르기용
   const defGuard = activeGuard(defender);
 
   // 기술을 고른 뒤에야 얼음/마비/혼란으로 인한 행동 저지를 판정 (버튼은 항상 활성화된 상태로 유지)
@@ -695,6 +744,17 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
       currentAttacker = { ...currentAttacker, screen: { name: moveSlot.name, appliedTurn: currentTurn, expireTurn: currentTurn + SCREEN_TURNS } };
       entries[myKey][activeIdx[myKey]] = currentAttacker;
       log.push(`${attackerName}${josa(attackerName, "은는")} ${moveSlot.name}${josa(moveSlot.name, "으로")} 받는 데미지가 줄어들었다!`);
+    }
+  } else if (moveData.aquaRing) {
+    // 아쿠아링: 라운드 종료마다 최대 체력의 1/16 회복. 이미 두르고 있으면 실패.
+    const attackerName = currentAttacker.name ?? "포켓몬";
+    log.push(`${attackerName}의 ${moveSlot.name}!`);
+    if (currentAttacker.aquaRing) {
+      log.push("그러나 실패했다!");
+    } else {
+      currentAttacker = { ...currentAttacker, aquaRing: true };
+      entries[myKey][activeIdx[myKey]] = currentAttacker;
+      log.push(`${attackerName}${josa(attackerName, "은는")} 물의 베일을 둘렀다!`);
     }
   } else if (moveData.futureSight) {
     // 미래예지: 지금은 공격하지 않고 상대 진영에 예약. FUTURE_SIGHT_DELAY 라운드 뒤 라운드 종료 시
@@ -788,6 +848,7 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     const defenderName = defender.name ?? "포켓몬";
     log.push(`${attackerName}의 ${moveSlot.name}!`);
     log.push(`${defenderName}에게는 맞지 않았다!`);
+    moveMissed = true;
   } else {
     const attackerName = currentAttacker.name ?? "포켓몬";
     log.push(`${attackerName}의 ${moveSlot.name}!`);
@@ -807,12 +868,14 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
 
     if (!accuracyHit) {
       log.push(`그러나 ${attackerName}의 공격은 빗나갔다!`);
+      moveMissed = true;
     } else {
       const evaded = !isAlwaysHit(moveData, currentWeather?.type) && rollEvasion(attacker, defender, oppRanks, currentTurn);
       const defenderName = defender.name ?? "포켓몬";
 
       if (evaded) {
         log.push(`${defenderName}에게는 맞지 않았다!`);
+        moveMissed = true;
       } else {
         // 공격 랭크업/다운: (위력 + 공격력x4 + 1d10) 전체에 곱해짐, 타입상성/자속 적용 "이전" 보정값 (급소율에는 영향 없음)
         // 방어 랭크업/다운: 방어력x3 항에만 곱해짐. 모래바람 중 바위 타입 방어자는 방어 랭크 +2 보정을 추가로 받음
@@ -842,6 +905,14 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           if (moveData.avalanche && attacker.lastHitRound === currentTurn) power = 70;
           // 베놈쇼크: 상대가 독 상태면 위력 1.5배
           if (moveData.venomShock && defender.status === "독") power = Math.round(power * VENOM_SHOCK_MULT);
+          // 분함의발구르기: 직전 라운드에 쓴 기술이 빗나갔으면 위력 1.5배
+          if (moveData.stomping && attacker.missedRound === currentTurn - 1) power = Math.round(power * CONDITIONAL_POWER_MULT);
+          // 객기: 자신이 독/마비/화상 상태면 위력 1.5배
+          if (moveData.guts && GUTS_STATUSES.includes(attacker.status)) power = Math.round(power * CONDITIONAL_POWER_MULT);
+          // 소금물: 상대 HP가 절반 이하면 위력 1.5배
+          if (moveData.saltWater && defender.hp * 2 <= (defender.maxHp ?? defender.hp)) power = Math.round(power * CONDITIONAL_POWER_MULT);
+          // 병상첨병: 상대가 상태이상이면 위력 1.5배
+          if (moveData.sickPower && defender.status) power = Math.round(power * CONDITIONAL_POWER_MULT);
           // 연속자르기: 연속으로 맞힐 때마다 +10 (30 -> 40 -> 50, 최대 50)
           if (moveData.furyCutter) {
             power = Math.min(FURY_CUTTER_MAX_POWER, moveData.power + 10 * (attacker.furyCutter ?? 0));
@@ -988,6 +1059,12 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
           }
         }
 
+        // 지옥찌르기: 맞은 상대는 다음 라운드부터 THROAT_CHOP_TURNS 라운드간 소리 기술 사용 불가 (걸려 있으면 기간 갱신)
+        if (moveData.throatChop && typeMult > 0 && updatedDefender.hp > 0) {
+          updatedDefender = { ...updatedDefender, throatChop: { startTurn: currentTurn + 1, expireTurn: currentTurn + THROAT_CHOP_TURNS } };
+          log.push(`${defenderName}${josa(defenderName, "은는")} 소리 기술을 쓸 수 없게 되었다!`);
+        }
+
         // 회오리불꽃류(trap): 맞은 상대를 TRAP_MIN~MAX_TURNS 라운드간 가둠 (이미 갇혀 있으면 갱신하지 않음)
         if (moveData.trap && moveData.power > 0 && typeMult > 0 && updatedDefender.hp > 0 && !updatedDefender.trap) {
           const turns = TRAP_MIN_TURNS + Math.floor(Math.random() * (TRAP_MAX_TURNS - TRAP_MIN_TURNS + 1));
@@ -1093,6 +1170,12 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
     }
   }
 
+  // 분함의발구르기: 빗나간 라운드를 기록 (다음 라운드에 위력 판정)
+  if (moveMissed) {
+    const cur = entries[myKey][activeIdx[myKey]];
+    entries[myKey][activeIdx[myKey]] = { ...cur, missedRound: currentTurn };
+  }
+
   // 거대해머류: 실제로 기술을 썼으면(빗나가거나 막혀도) 다음 라운드엔 사용 불가
   if (moveData.heavyHammer && !blocked) {
     const cur = entries[myKey][activeIdx[myKey]];
@@ -1144,10 +1227,10 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
   return ok(update);
 }
 
-// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발/카운터용 피격 데미지/회오리불꽃류/혼란·풀죽음)
+// 교체로 들어가는 포켓몬에게서 해제되는 상태 (방어류/빛의장막·리플렉터/연속자르기 누적/방어류 연속 사용 기록/도발/카운터용 피격 데미지/회오리불꽃류/아쿠아링/지옥찌르기/빗나감 기록/혼란·풀죽음)
 function clearOnSwitchOut(pokemon) {
   const { "혼란": _confusion, "풀죽음": _flinch, ...volatiles } = pokemon.volatiles ?? {};
-  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null, lastDamageTaken: 0, trap: null, volatiles };
+  return { ...pokemon, guard: null, guardStreak: false, screen: null, furyCutter: 0, taunt: null, lastDamageTaken: 0, trap: null, aquaRing: false, throatChop: null, missedRound: null, volatiles };
 }
 
 // 교체 공통 처리(자발적 교체/강제 교체/유턴): 나가는 포켓몬 상태 정리 -> 내보내기 로그/연출 -> 장판 적용.
