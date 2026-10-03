@@ -39,6 +39,27 @@ const queue = []; // { roomId, actionId }
 let busy = false;
 let unsubRooms = null;
 
+// Firestore는 undefined 값을 저장하지 못한다. 판정 결과에 섞인 undefined의 위치를 찾고(원인 추적용 로그),
+// 객체 필드는 빼고 배열 원소는 null로 바꾼 사본을 돌려준다.
+function stripUndefined(value, path = "", found = []) {
+  if (value === undefined) {
+    found.push(path || "(root)");
+    return { value: undefined, found };
+  }
+  if (Array.isArray(value)) {
+    return { value: value.map((v, i) => stripUndefined(v, `${path}[${i}]`, found).value ?? null), found };
+  }
+  if (value && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    const out = {};
+    for (const [k, v] of Object.entries(value)) {
+      const r = stripUndefined(v, path ? `${path}.${k}` : k, found).value;
+      if (r !== undefined) out[k] = r;
+    }
+    return { value: out, found };
+  }
+  return { value, found };
+}
+
 // ---- 화면 ----
 const $ = (id) => document.getElementById(id);
 
@@ -283,18 +304,24 @@ async function processAction(roomId, actionId) {
         ? await judgeSelect(tx, roomId, room, action, actionId)
         : judge(room, action);
 
+    let undefinedPaths = [];
     if (verdict.ok) {
-      tx.update(roomRef, verdict.update);
+      const cleaned = stripUndefined(verdict.update ?? {});
+      undefinedPaths = cleaned.found;
+      tx.update(roomRef, cleaned.value);
       tx.update(actionRef, { status: "done", processedAt: serverTimestamp() });
     } else {
       tx.update(actionRef, { status: "rejected", reason: verdict.reason, processedAt: serverTimestamp() });
     }
-    return { action, verdict, side: room ? sideOfUid(room, action.uid) : null };
+    return { action, verdict, undefinedPaths, side: room ? sideOfUid(room, action.uid) : null };
   });
 
   if (!result) return;
-  const { action, verdict, side } = result;
+  const { action, verdict, undefinedPaths, side } = result;
   const who = `${roomId}/${side ?? "?"}`;
+  if (undefinedPaths.length > 0) {
+    gmLog(`${who} ${action.type} 결과에 undefined 값이 있어 제거하고 저장함: ${undefinedPaths.slice(0, 10).join(", ")}`, "warn");
+  }
   // 선택 내용(picks)은 로그에도 남기지 않음
   const shown = action.type === "select" ? "" : ` ${JSON.stringify(action.payload ?? {})}`;
   if (verdict.ok) gmLog(`${who} ${action.type}${shown} 처리`);
