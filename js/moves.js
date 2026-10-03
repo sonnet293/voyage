@@ -67,7 +67,6 @@ export const MOVES = {
                   outrage: { confusion: false, minTurn: 2, maxTurn: 5, powers: [50, 45, 40, 40, 40] } },
   "더블윙":     { power: 30, type: "비행", accuracy: 90,  alwaysHit: false, effect: null,
                   multiHit: { min: 2, max: 2 } },
-  // 고속스핀
   "고속스핀":   { power: 40, type: "노말", accuracy: 100, alwaysHit: false, effect: null,
                   rapidSpin: true, rank: { spd: 1, turns: 3 } },
   "울트라메가튀어오르기": { power: 0, type: "노말", accuracy: 100, alwaysHit: true, effect: null, divineStrike: true, targetSelf: true },

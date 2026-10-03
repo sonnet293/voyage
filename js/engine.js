@@ -959,9 +959,12 @@ export function useMove(room, myKey, moveIdx, uTurnIdx = null) {
             } else if (multiHit?.fixedDamage) {
               hitDmg = typeMult === 0 ? 0 : multiHit.fixedDamage;
             } else {
-              const rawDamage =
-                (power + attacker.atk * 4 + rollD10()) * atkMult * typeMult * stab * weatherMult -
-                defender.def * 3 * defMult;
+              // 연속기(fixedDamage 없는 multiHit)는 타격 수가 많아 별도 식 사용 (1d10 없음):
+              // 타격당 (위력 + 공격력) x 공격랭크보정 x 타입상성 x 자속 - (방어력 x 방어랭크보정)
+              const rawDamage = multiHit
+                ? (power + attacker.atk) * atkMult * typeMult * stab * weatherMult - defender.def * defMult
+                : (power + attacker.atk * 4 + rollD10()) * atkMult * typeMult * stab * weatherMult -
+                  defender.def * 3 * defMult;
               isCrit = rollCrit(attacker);
               hitDmg = Math.max(0, Math.round(rawDamage * (isCrit ? 1.5 : 1) * screenMult));
             }
