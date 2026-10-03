@@ -130,7 +130,7 @@ export const MOVES = {
   "번개펀치":     { power: 45, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.1, status: "마비" } },
   "10만볼트":     { power: 50, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.3, status: "마비" } },
   "방전":         { power: 50, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.3, status: "마비" }, aoe: true },
-  "번개":         { power: 60, type: "전기", accuracy: 60,  alwaysHit: false, effect: { chance: 0.3, status: "마비" },
+  "번개":         { power: 60, type: "전기", accuracy: 70,  alwaysHit: false, effect: { chance: 0.3, status: "마비" },
                     weatherAlwaysHit: ["비"] },
   "전기쇼크":     { power: 30, type: "전기", accuracy: 100, alwaysHit: false, effect: { chance: 0.1, status: "마비" } },
   "전기자석파":   { power: 0,  type: "전기", accuracy: 90,  alwaysHit: false, targetSelf: false,
